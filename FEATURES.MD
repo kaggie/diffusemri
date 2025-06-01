@@ -100,6 +100,9 @@ This document details the current features and status of the `diffusemri` librar
 *   **Subcommand `ismrmrd_convert` (internal `run_ismrmrd_convert`)**
     *   Description: Placeholder CLI for converting ISMRMRD files to NIfTI and extracting metadata.
     *   Status: `Placeholder - Not Implemented`
+*   **Subcommand `bruker2nii` (aliases: `bruker_to_nifti`) (internal `run_bruker_to_nifti`)**
+    *   Description: Converts Bruker ParaVision DWI data to NIfTI format, including b-values and b-vectors.
+    *   Status: `Implemented`
 *   **`main()`**
     *   Description: Main CLI entry point for `run_format_conversion.py`, dispatching to various subcommands.
     *   Status: `Implemented`

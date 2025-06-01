@@ -394,6 +394,64 @@ class TestCliFormatConversion(unittest.TestCase):
         self.assertEqual(call_args[1]['series_number'], 99) # Should be int
         self.assertTrue(call_args[1]['create_dirs'])
 
+    @mock.patch('cli.run_format_conversion.read_bruker_dwi_data')
+    @mock.patch('cli.run_format_conversion.save_nifti_data')
+    @mock.patch('cli.run_format_conversion.np.savetxt')
+    def test_cli_bruker_to_nifti(self, mock_savetxt, mock_save_nifti, mock_read_bruker):
+        # Mock return values from read_bruker_dwi_data
+        mock_image_data = np.random.rand(10, 10, 5, 3).astype(np.float32) # Example data X,Y,Z,T
+        mock_affine = np.eye(4)
+        mock_bvals = np.array([0, 1000, 1000])
+        mock_bvecs = np.array([[0,0,0], [1,0,0], [0,1,0]], dtype=float)
+        mock_metadata = {"VisuCoreDim": 3, "VisuStudyPath": "/some/path"}
+
+        mock_read_bruker.return_value = (
+            mock_image_data,
+            mock_affine,
+            mock_bvals,
+            mock_bvecs,
+            mock_metadata
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_bruker_dir = os.path.join(tmpdir, "bruker_exp_1") # Does not need to exist due to mocking
+            # os.makedirs(input_bruker_dir) # Not strictly needed if read_bruker_dwi_data is mocked
+
+            output_nifti = os.path.join(tmpdir, "output_bruker.nii.gz")
+            output_bval = os.path.join(tmpdir, "output_bruker.bval")
+            output_bvec = os.path.join(tmpdir, "output_bruker.bvec")
+
+            cli_args = [
+                'bruker2nii', # Using alias
+                '--input_bruker_dir', input_bruker_dir,
+                '--output_nifti', output_nifti,
+                '--output_bval', output_bval,
+                '--output_bvec', output_bvec
+            ]
+
+            try:
+                run_format_conversion.main(cli_args)
+            except SystemExit as e:
+                self.fail(f"CLI script bruker2nii exited unexpectedly with code {e.code} for args: {cli_args}")
+
+            mock_read_bruker.assert_called_once_with(input_bruker_dir)
+
+            # Check that save_nifti_data was called correctly
+            mock_save_nifti.assert_called_once_with(
+                mock_image_data,
+                mock_affine,
+                output_nifti
+            )
+
+            # Check bval/bvec saves
+            self.assertEqual(mock_savetxt.call_count, 2)
+            # First call for bvals
+            self.assertEqual(mock_savetxt.call_args_list[0][0][0], output_bval)
+            np.testing.assert_array_equal(mock_savetxt.call_args_list[0][0][1], mock_bvals.reshape(1,-1))
+            # Second call for bvecs
+            self.assertEqual(mock_savetxt.call_args_list[1][0][0], output_bvec)
+            np.testing.assert_array_equal(mock_savetxt.call_args_list[1][0][1], mock_bvecs)
+
 
 if __name__ == '__main__':
     unittest.main()

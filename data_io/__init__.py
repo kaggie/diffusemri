@@ -38,7 +38,8 @@ __all__ = [
     'load_dict_from_hdf5',
     'save_dict_to_mat',
     'load_dict_from_mat',
-    'write_nifti_to_dicom_secondary' # Added from dicom_utils
+    'write_nifti_to_dicom_secondary', # Added from dicom_utils
+    'read_bruker_dwi_data' # Added from bruker_utils
 ]
 
 # Import from dicom_utils
@@ -89,5 +90,11 @@ try:
         save_dict_to_hdf5, load_dict_from_hdf5,
         save_dict_to_mat, load_dict_from_mat
     )
+except ImportError:
+    pass
+
+# Import from bruker_utils
+try:
+    from .bruker_utils import read_bruker_dwi_data
 except ImportError:
     pass

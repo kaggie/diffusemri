@@ -11,6 +11,7 @@ try:
     from diffusemri.data_io.ismrmrd_utils import convert_ismrmrd_to_nifti_and_metadata
     from diffusemri.data_io.parrec_utils import convert_parrec_to_nifti
     from diffusemri.data_io.dicom_utils import write_nifti_to_dicom_secondary # Added for nii2dicom_sec
+    from diffusemri.data_io.bruker_utils import read_bruker_dwi_data # Added for Bruker
     from diffusemri.data_io.cli_utils import save_nifti_data
 except ImportError:
     # Fallback for direct script execution if diffusemri is not in PYTHONPATH
@@ -24,6 +25,7 @@ except ImportError:
     from data_io.ismrmrd_utils import convert_ismrmrd_to_nifti_and_metadata
     from data_io.parrec_utils import convert_parrec_to_nifti
     from data_io.dicom_utils import write_nifti_to_dicom_secondary # Added for nii2dicom_sec
+    from data_io.bruker_utils import read_bruker_dwi_data # Added for Bruker
     from data_io.cli_utils import save_nifti_data
 
 
@@ -202,6 +204,15 @@ def main():
         description="Converts a NIfTI volume into a series of DICOM Secondary Capture files."
     )
     setup_nifti_to_dicom_secondary_parser(nii_to_dicom_sec_parser)
+
+    # --- Bruker to NIfTI Subcommand ---
+    bruker_to_nii_parser = subparsers.add_parser(
+        "bruker2nii", # Alias
+        aliases=['bruker_to_nifti'],
+        help="Convert Bruker ParaVision DWI data to NIfTI format.",
+        description="Reads a Bruker ParaVision experiment directory and converts DWI data to NIfTI, bval, and bvec files."
+    )
+    setup_bruker_to_nifti_parser(bruker_to_nii_parser)
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -431,4 +442,56 @@ def run_nifti_to_dicom_secondary(args):
             sys.exit(1)
     except Exception as e:
         print(f"Error during NIfTI to DICOM Secondary Capture conversion: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# --- Bruker to NIfTI ---
+def setup_bruker_to_nifti_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_bruker_dir', required=True,
+                        help="Path to the Bruker ParaVision experiment directory (e.g., subject/study/exp_num).")
+    parser.add_argument('--output_nifti', required=True, help="Path to save the output NIfTI file.")
+    parser.add_argument('--output_bval', required=True, help="Path to save the output b-values file.")
+    parser.add_argument('--output_bvec', required=True, help="Path to save the output b-vectors file.")
+    parser.set_defaults(func=run_bruker_to_nifti)
+
+def run_bruker_to_nifti(args):
+    print(f"Converting Bruker ParaVision data from: {args.input_bruker_dir}")
+    print(f"Output NIfTI: {args.output_nifti}")
+    print(f"Output bval: {args.output_bval}")
+    print(f"Output bvec: {args.output_bvec}")
+
+    try:
+        result = read_bruker_dwi_data(args.input_bruker_dir)
+        if result is None:
+            print(f"Failed to read Bruker data from {args.input_bruker_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        image_data, affine, bvals, bvecs, metadata_dict = result
+
+        if image_data is None or affine is None:
+            print("No image data or affine extracted from Bruker dataset.", file=sys.stderr)
+            sys.exit(1)
+
+        if not np.issubdtype(image_data.dtype, np.floating):
+            image_data = image_data.astype(np.float32) # Ensure float for NIfTI saving
+
+        save_nifti_data(image_data, affine, args.output_nifti)
+        print(f"NIfTI file saved to: {args.output_nifti}")
+
+        if bvals is not None:
+            np.savetxt(args.output_bval, bvals.reshape(1, -1), fmt='%g')
+            print(f"b-values saved to: {args.output_bval}")
+        else:
+            print("Warning: b-values were not extracted. .bval file will not be created or will be empty.", file=sys.stderr)
+
+        if bvecs is not None:
+            np.savetxt(args.output_bvec, bvecs, fmt='%.8f') # Assuming Nx3 format
+            print(f"b-vectors saved to: {args.output_bvec}")
+        else:
+            print("Warning: b-vectors were not extracted. .bvec file will not be created or will be empty.", file=sys.stderr)
+
+        print("Bruker ParaVision to NIfTI conversion successful.")
+
+    except Exception as e:
+        print(f"Error during Bruker to NIfTI conversion: {e}", file=sys.stderr)
         sys.exit(1)

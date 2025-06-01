@@ -164,6 +164,7 @@ print("Minimal example executed (actual plotting commented out for brevity in RE
 *   **MHD/MHA (.mhd, .raw, .zraw, .mha):** Reading and writing MetaImageHeader files using SimpleITK, with NIfTI conversion and DWI metadata support (`data_io.mhd_utils`).
 *   **Analyze 7.5 (.hdr, .img):** Basic reading and writing capabilities for the Analyze 7.5 format, including NIfTI conversion. Users should be aware of Analyze's limitations regarding orientation and metadata (`data_io.analyze_utils`).
 *   **Philips PAR/REC:** Reading Philips PAR/REC files (typically versions 4.0-4.2) via Nibabel, enabling conversion to NIfTI and extraction of DWI metadata (`data_io.parrec_utils`).
+*   **Bruker ParaVision:** Reading Bruker ParaVision DWI datasets using `brukerapi`, with conversion to NIfTI including b-values and b-vectors (`data_io.bruker_utils`).
 *   **ISMRMRD (.h5):** Placeholder support for reading ISMRMRD raw/reconstructed data. Full implementation is a future goal (`data_io.ismrmrd_utils`).
 *   **Generic Formats:**
     *   **HDF5 (.h5):** Utilities to save and load Python dictionaries of NumPy arrays, suitable for structured storage of multiple datasets (`data_io.generic_utils`).
@@ -214,6 +215,7 @@ For more in-depth information, tutorials, and advanced usage, please refer to th
 *   [04 - Tractography](wiki/04_Tractography.md)
 *   [07 - Format Conversion](wiki/07_Format_Conversion.md)
 *   [08 - Generic Data I/O (HDF5, MAT)](wiki/08_Generic_Data_IO_HDF5_MAT.md)
+*   [09 - Bruker ParaVision I/O](wiki/09_Bruker_ParaVision_IO.md)
 *   ... and other pages covering specific features and examples.
 
 (Note: `Validation and Benchmarking`, `Contribution Guidelines`, `Coding Standards`, and `Code of Conduct` sections from the original README would typically follow here. For brevity in this diff, assuming they remain largely unchanged unless specified otherwise.)

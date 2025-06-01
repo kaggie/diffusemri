@@ -12,6 +12,7 @@ pyqtgraph
 h5py
 pydicom>=2.0.0
 matplotlib>=3.3.0
+brukerapi>=0.1.9 # Or a suitable version
 # For FSL integration (optional, handled by user environment)
 # nipype
 # For PyTorch based components (optional, handled by user environment)
