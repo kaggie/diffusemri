@@ -37,39 +37,66 @@ Deterministic tractography algorithms reconstruct streamlines by iteratively fol
 *   **Example Usage:**
     ```python
     import numpy as np
-    # from dipy.core.gradients import gradient_table # For gtab creation
-    # from diffusemri.tracking.deterministic import track_deterministic_oudf # Conceptual
+    from dipy.core.gradients import gradient_table
+    from diffusemri.tracking.deterministic import track_deterministic_oudf
     
-    # # --- This is a conceptual example ---
-    # # Assume dwi_data_np (4D NumPy), gtab (Dipy GradientTable), 
-    # # affine_np (4x4 NumPy), seeds_np (NumPy mask or Nx3 coords),
-    # # and fa_map_np (3D NumPy for stopping) are loaded/created.
+    # Create minimal synthetic data for tractography
+    vol_shape = (5, 5, 5) # A small 3D volume
+    num_gradients = 7 # 1 b0, 6 DWI
 
-    # # fa_threshold = 0.2
+    # DWI data: Random data, b0 higher signal
+    dwi_data_np = np.random.rand(vol_shape[0], vol_shape[1], vol_shape[2], num_gradients).astype(np.float32) * 500
+    dwi_data_np[..., 0] = 1000 # b0 signal
+    # Simulate some anisotropy for tracking: make one direction have lower signal (higher diffusivity)
+    # For example, make signal lower along a simulated "bundle" in x-direction for y=2, z=2
+    dwi_data_np[2, 2, :, 1] = 300 # Lower signal for bvec (1,0,0)
+    dwi_data_np[2, 2, :, 4] = 300 # Lower signal for bvec (-1,0,0)
 
-    # # streamlines_obj = track_deterministic_oudf(
-    # #     dwi_data=dwi_data_np,
-    # #     gtab=gtab,
-    # #     seeds=seeds_np, # This is passed to the wrapper
-    # #     affine=affine_np,
-    # #     metric_map_for_stopping=fa_map_np, # Wrapper expects np.ndarray
-    # #     stopping_threshold_value=fa_threshold,
-    # #     # Model parameters (for internal PeaksFromModel)
-    # #     sh_order=6,
-    # #     model_max_peaks=3,
-    # #     model_min_separation_angle=25,
-    # #     model_peak_threshold=0.4,
-    # #     # Tracking parameters
-    # #     step_size=0.5,
-    # #     max_crossing_angle=30,
-    # #     min_length=10.0,
-    # #     max_length=200.0,
-    # #     max_steps=500 
-    # # )
+
+    # Gradient table (same as DTI example for simplicity)
+    bvals_np = np.array([0, 1000, 1000, 1000, 1000, 1000, 1000], dtype=np.float32)
+    bvecs_np = np.array([
+        [0,0,0], [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]
+    ], dtype=np.float32)
+    gtab = gradient_table(bvals_np, bvecs_np)
+
+    # Affine matrix (identity for simple voxel space)
+    affine_np = np.eye(4)
+
+    # Seeds: a single seed point in the middle of the volume
+    seeds_np = np.array([[2, 2, 2]], dtype=np.float32) # Voxel coordinates
+
+    # Stopping metric map: FA map (or simple ones for this example)
+    # For simplicity, use a map of ones, so tracking stops based on other criteria (angle, length)
+    # A more realistic FA map would be derived from DTI fitting.
+    fa_map_np = np.ones(vol_shape, dtype=np.float32)
+    fa_threshold = 0.1 # Low threshold as FA map is artificial
+
+    # Perform deterministic tractography
+    # Parameters are adjusted for the small synthetic data
+    streamlines_obj = track_deterministic_oudf(
+        dwi_data=dwi_data_np,
+        gtab=gtab,
+        seeds=seeds_np,
+        affine=affine_np,
+        metric_map_for_stopping=fa_map_np,
+        stopping_threshold_value=fa_threshold,
+        # Model parameters
+        sh_order=4,             # Lower SH order for small data
+        model_max_peaks=1,      # Expect simple structure
+        model_min_separation_angle=15,
+        model_peak_threshold=0.3,
+        # Tracking parameters
+        step_size=0.5,          # Standard step size
+        max_crossing_angle=60,  # Allow for some curvature
+        min_length=2.0,         # Shorter min length for small volume
+        max_length=20.0,        # Shorter max length
+        max_steps=40            # Max steps = max_length / step_size
+    )
     
-    # # print(f"Generated {len(streamlines_obj)} streamlines.")
-    # # if streamlines_obj:
-    # #     # Further processing, saving, or visualization using Dipy tools
-    # #     pass
-    print("Note: To run the tractography example, ensure 'track_deterministic_oudf' and input data are correctly set up.")
+    print(f"Generated {len(streamlines_obj)} streamlines.")
+    if len(streamlines_obj) > 0:
+        print(f"First streamline has {len(streamlines_obj[0])} points.")
+        # Example: print first point of the first streamline
+        # print(f"First point of first streamline: {streamlines_obj[0][0]}")
     ```

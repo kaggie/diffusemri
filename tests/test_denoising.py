@@ -1,7 +1,14 @@
 import unittest
+from unittest import mock # Added for mocking
 import torch
-import numpy as np # For comparison or generating initial data if needed
-from preprocessing.pytorch_denoising import pytorch_mppca # Adjust import if necessary
+import numpy as np
+import nibabel as nib # Added for NIFTI handling in new tests
+import os # For path manipulation if needed for tmp_path
+import tempfile # For creating temporary files/directories
+
+from preprocessing.pytorch_denoising import pytorch_mppca
+from preprocessing.denoising import correct_gibbs_ringing_dipy # Import the new wrapper
+from cli import run_preprocessing # For testing the CLI endpoint for Gibbs
 
 class TestPytorchMPPCA(unittest.TestCase):
 
@@ -178,4 +185,87 @@ class TestPytorchMPPCA(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# --- Tests for Gibbs Ringing Correction ---
+
+class TestGibbsCorrection(unittest.TestCase):
+    @mock.patch('preprocessing.denoising.nib') # Mock nibabel within denoising.py
+    @mock.patch('preprocessing.denoising.gibbs_removal')
+    def test_correct_gibbs_ringing_dipy_wrapper(self, mock_dipy_gibbs_removal, mock_nib):
+        # Setup mock nibabel behavior
+        mock_img_instance = mock.Mock()
+        mock_img_instance.get_fdata.return_value = np.random.rand(10, 10, 10).astype(np.float32)
+        mock_img_instance.affine = np.eye(4)
+        mock_img_instance.header = mock.Mock() # Simple mock for header
+        mock_nib.load.return_value = mock_img_instance
+
+        # Setup mock gibbs_removal behavior
+        mock_corrected_data = np.random.rand(10, 10, 10).astype(np.float32)
+        mock_dipy_gibbs_removal.return_value = mock_corrected_data
+
+        input_file = "dummy_input.nii.gz"
+        output_file = "dummy_output_corrected.nii.gz"
+
+        # Call the wrapper function
+        returned_output_path = correct_gibbs_ringing_dipy(
+            input_image_file=input_file,
+            output_corrected_file=output_file,
+            slice_axis=2,
+            n_points=3,
+            num_processes=1
+        )
+
+        # Assertions
+        mock_nib.load.assert_called_once_with(input_file)
+        mock_dipy_gibbs_removal.assert_called_once_with(
+            mock_img_instance.get_fdata.return_value,
+            slice_axis=2,
+            n_points=3,
+            num_processes=1,
+            inplace=False
+        )
+        mock_nib.save.assert_called_once()
+        # Check the first arg of save is a Nifti1Image with the corrected data and original affine/header
+        saved_img_arg = mock_nib.save.call_args[0][0]
+        self.assertIsInstance(saved_img_arg, nib.Nifti1Image)
+        np.testing.assert_array_equal(saved_img_arg.get_fdata(), mock_corrected_data)
+        np.testing.assert_array_equal(saved_img_arg.affine, mock_img_instance.affine)
+        self.assertEqual(saved_img_arg.header, mock_img_instance.header)
+        # Check the second arg of save is the output_file path
+        self.assertEqual(mock_nib.save.call_args[0][1], output_file)
+
+        self.assertEqual(returned_output_path, output_file)
+
+    @mock.patch('cli.run_preprocessing.correct_gibbs_ringing_dipy') # Mock the actual function called by CLI
+    def test_cli_run_gibbs_ringing_dipy(self, mock_correct_gibbs_func, tmp_path):
+        mock_correct_gibbs_func.return_value = "gibbs_corrected_cli.nii.gz"
+
+        dummy_input_cli = tmp_path / "input_for_gibbs_cli.nii.gz"
+        dummy_output_cli = tmp_path / "output_gibbs_cli.nii.gz"
+        dummy_input_cli.touch()
+
+        cli_args = [
+            'gibbs_ringing_dipy',
+            '--input_file', str(dummy_input_cli),
+            '--output_file', str(dummy_output_cli),
+            '--slice_axis', '1',
+            '--n_points', '2',
+            '--num_processes', '2'
+        ]
+
+        try:
+            run_preprocessing.main(cli_args)
+        except SystemExit as e:
+            if e.code != 0:
+                self.fail(f"CLI script exited with code {e.code} for args: {cli_args}")
+
+        mock_correct_gibbs_func.assert_called_once()
+        called_args_dict = mock_correct_gibbs_func.call_args[1] # kwargs
+
+        self.assertEqual(called_args_dict['input_image_file'], str(dummy_input_cli))
+        self.assertEqual(called_args_dict['output_corrected_file'], str(dummy_output_cli))
+        self.assertEqual(called_args_dict['slice_axis'], 1)
+        self.assertEqual(called_args_dict['n_points'], 2)
+        self.assertEqual(called_args_dict['num_processes'], 2)
 ```

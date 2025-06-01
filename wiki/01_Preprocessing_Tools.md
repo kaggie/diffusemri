@@ -17,29 +17,22 @@ This section details the tools available in the `diffusemri` library to help pre
 *   **Example Usage:**
     ```python
     import numpy as np
-    # from diffusemri.preprocessing.masking import create_brain_mask # Assuming correct import path
+    from diffusemri.preprocessing.masking import create_brain_mask
 
-    # --- Assuming create_brain_mask is in a place accessible like this for example ---
-    # This is a placeholder for where the actual function would be imported from
-    # For the purpose of this documentation, we'll assume it's available.
-    # In the actual library, it might be:
-    # from dmri_library_name.preprocessing.masking import create_brain_mask
-    
     # Example: Create dummy 4D dMRI data (e.g., 10x10x10 volume, 5 gradients)
     dummy_dmri_data = np.random.rand(10, 10, 10, 5).astype(np.float32) * 2000
     dummy_voxel_size = (2.0, 2.0, 2.0)
 
-    # brain_mask, masked_data = create_brain_mask(
-    #     dummy_dmri_data, 
-    #     dummy_voxel_size, 
-    #     median_radius=4, 
-    #     numpass=4
-    # )
+    brain_mask, masked_data = create_brain_mask(
+        dummy_dmri_data,
+        dummy_voxel_size,
+        median_radius=4,
+        numpass=4
+    )
     
-    # print(f"Brain mask shape: {brain_mask.shape}")
-    # print(f"Masked data shape: {masked_data.shape}")
-    # print(f"Number of voxels in mask: {np.sum(brain_mask)}")
-    print("Note: To run the brain masking example, ensure 'create_brain_mask' is correctly imported from the library.")
+    print(f"Brain mask shape: {brain_mask.shape}")
+    print(f"Masked data shape: {masked_data.shape}")
+    print(f"Number of voxels in mask: {np.sum(brain_mask)}")
     ```
 
 ## Noise Reduction
@@ -55,7 +48,7 @@ This section details the tools available in the `diffusemri` library to help pre
 *   **Example Usage:**
     ```python
     import numpy as np
-    # from diffusemri.preprocessing.denoising import denoise_mppca_data # Assuming correct import path
+    from diffusemri.preprocessing.denoising import denoise_mppca_data
     
     # Example: Create dummy 4D dMRI data
     dummy_dmri_data = np.random.rand(10, 10, 10, 20).astype(np.float32) * 100
@@ -63,11 +56,10 @@ This section details the tools available in the `diffusemri` library to help pre
     dummy_dmri_data += np.random.normal(0, 15, dummy_dmri_data.shape) 
     dummy_dmri_data = np.clip(dummy_dmri_data, 0, None)
 
-    # denoised_data = denoise_mppca_data(dummy_dmri_data, patch_radius=2)
+    denoised_data = denoise_mppca_data(dummy_dmri_data, patch_radius=2)
     
-    # print(f"Denoised data shape: {denoised_data.shape}")
-    # print(f"Original data mean: {np.mean(dummy_dmri_data):.2f}, Denoised data mean: {np.mean(denoised_data):.2f}")
-    print("Note: To run the noise reduction example, ensure 'denoise_mppca_data' is correctly imported from the library.")
+    print(f"Denoised data shape: {denoised_data.shape}")
+    print(f"Original data mean: {np.mean(dummy_dmri_data):.2f}, Denoised data mean: {np.mean(denoised_data):.2f}")
     ```
 
 ## Motion and Eddy Current Correction
@@ -91,7 +83,8 @@ This section details the tools available in the `diffusemri` library to help pre
 
 *   **Conceptual Example Usage:**
     ```python
-    # from diffusemri.preprocessing.correction import correct_motion_eddy_fsl, load_eddy_outlier_report
+    from diffusemri.preprocessing.correction import correct_motion_eddy_fsl, load_eddy_outlier_report
+    print("Successfully imported correct_motion_eddy_fsl and load_eddy_outlier_report.")
     
     # # --- This is a conceptual example. Actual paths and FSL installation are needed. ---
     # dwi_nifti_path = "path/to/your/dwi.nii.gz"
@@ -127,5 +120,154 @@ This section details the tools available in the `diffusemri` library to help pre
     #     print(f"FSL eddy correction requires FSL installed and configured. Error: {e}")
     # except FileNotFoundError as e:
     #     print(f"One of the input files was not found: {e}")
-    print("Note: To run the motion/eddy correction example, ensure FSL is installed, input files exist, and function is correctly imported.")
+    print("Note: The main part of the motion/eddy correction example requires FSL installed and actual data paths.")
+    ```
+
+## Susceptibility Distortion Correction (FSL TOPUP)
+
+*   **Purpose:** To correct for geometric distortions in dMRI data caused by susceptibility-induced magnetic field inhomogeneities. These distortions are particularly problematic in regions with tissue-air interfaces (e.g., near sinuses, ear canals) and are often characterized by stretching or compression of the image along phase-encoding directions. Correction typically requires images acquired with opposing phase-encoding directions (e.g., AP-PA pairs).
+*   **Function:** `diffusemri.preprocessing.correction.correct_susceptibility_topup_fsl()`
+*   **Method:** This function serves as a wrapper for FSL's `topup` and `applytopup` tools.
+    *   `topup`: Estimates the susceptibility-induced off-resonance field from pairs of images acquired with opposing phase-encoding directions (typically b0 images).
+    *   `applytopup`: Applies the estimated field correction to a target image series (which can be the same images used for `topup`, or a full DWI dataset that has similar PE direction as one of the `topup` inputs).
+    It uses [Nipype](https://nipype.readthedocs.io/en/latest/) to interface with these FSL command-line tools.
+*   **Dependencies:** This feature requires a local installation of FSL (with `topup` and `applytopup` available in the system PATH) and the `nipype` library. Users must ensure compliance with FSL's licensing terms.
+*   **Key Parameters for `correct_susceptibility_topup_fsl`:**
+    *   `imain_file` (str): Path to the 4D NIFTI file containing images for `topup` (e.g., concatenated AP and PA b0s).
+    *   `encoding_file` (str): Path to the text file describing acquisition parameters for `topup` (PE direction, total readout time for each volume in `imain_file`).
+    *   `out_base_name` (str): Base name for output files.
+    *   `images_to_correct_file` (str): Path to the 4D NIFTI image series to which correction will be applied.
+    *   `images_to_correct_encoding_indices` (list[int]): 1-based indices indicating which line(s) in `encoding_file` correspond to `images_to_correct_file`.
+    *   `config_file` (str, optional): FSL `topup` configuration file (e.g., "b02b0.cnf").
+    *   `output_type` (str, optional): FSL output type (e.g., "NIFTI_GZ").
+    *   `topup_kwargs` (dict, optional): Additional arguments for the `TOPUP` Nipype interface.
+    *   `applytopup_kwargs` (dict, optional): Additional arguments for the `ApplyTOPUP` Nipype interface.
+*   **Returns:** Paths to the corrected image, field map, topup field coefficients, and movement parameters.
+
+*   **Conceptual Example Usage:**
+    ```python
+    # from diffusemri.preprocessing.correction import correct_susceptibility_topup_fsl
+    # print("Successfully imported correct_susceptibility_topup_fsl.") # Verify import
+
+    # # --- This is a conceptual example. Actual paths and FSL installation are needed. ---
+    # # imain_file: e.g., a NIFTI file with 2 volumes: first b0 with AP, second b0 with PA
+    # topup_input_images_path = "path/to/your/ap_pa_b0s.nii.gz"
+    # # encoding_file: text file describing acquisition parameters for topup_input_images_path
+    # # Example content for 2 volumes (AP then PA):
+    # # 0 1 0 0.065  (AP: y-direction phase encode, total readout 65ms)
+    # # 0 -1 0 0.065 (PA: y-direction phase encode, total readout 65ms)
+    # pe_encoding_file_path = "path/to/your/phase_encode_params.txt"
+    # # images_to_correct_file: your full DWI dataset that needs correction
+    # dwi_to_correct_path = "path/to/your/full_dwi.nii.gz"
+    # # images_to_correct_encoding_indices: If full_dwi.nii.gz was acquired with AP phase encoding (like the 1st vol in topup_input_images_path)
+    # # and your encoding_file has AP as the first line (index 1 for FSL tools).
+    # # Assuming all volumes in dwi_to_correct_path share this PE scheme.
+    # dwi_pe_indices = [1] # Use [1] if all volumes in dwi_to_correct_path match 1st line of pe_encoding_file_path
+
+    # output_corrected_base = "path/to/output/dwi_corrected_topup"
+
+    # try:
+    #     corrected_img, field_map, field_coef, mov_params = correct_susceptibility_topup_fsl(
+    #         imain_file=topup_input_images_path,
+    #         encoding_file=pe_encoding_file_path,
+    #         out_base_name=output_corrected_base,
+    #         images_to_correct_file=dwi_to_correct_path,
+    #         images_to_correct_encoding_indices=dwi_pe_indices,
+    #         # config_file="b02b0.cnf", # Default
+    #         # topup_kwargs={'fwhm': 8}, # Example topup kwarg
+    #         # applytopup_kwargs={'method': 'jac'} # Default method
+    #     )
+    #     print(f"Susceptibility corrected image: {corrected_img}")
+    #     print(f"Field map (Hz): {field_map}")
+    #     print(f"Field coefficients: {field_coef}")
+    #     print(f"Movement parameters: {mov_params}")
+    # except RuntimeError as e:
+    #     print(f"FSL TOPUP/ApplyTOPUP correction requires FSL installed and configured. Error: {e}")
+    # except FileNotFoundError as e:
+    #     print(f"One of the input files for TOPUP/ApplyTOPUP was not found: {e}")
+    print("Note: The TOPUP/ApplyTOPUP example requires FSL installed, correctly configured input files, and the function imported.")
+    ```
+
+## Bias Field Correction (Dipý N4)
+
+*   **Purpose:** To correct for low-frequency intensity non-uniformities (bias field) in MR images. Bias fields can arise from imperfections in the scanner hardware or subject-induced field disturbances, leading to spatially varying intensity levels that can affect segmentation, registration, and quantitative analysis.
+*   **Function:** `diffusemri.preprocessing.correction.correct_bias_field_dipy()`
+*   **Method:** This function wraps Dipý's `BiasFieldCorrectionFlow`, which uses the 'n4' method (N4ITK algorithm, a variant of N3) for bias field correction. N4 is widely used and effective for various types of MR images, including T1w, T2w, and mean b0 images from DWI.
+*   **Dependencies:** This feature requires Dipý to be installed. The 'n4' method itself relies on ANTs/ITK being installed and accessible by Dipý.
+*   **Key Parameters for `correct_bias_field_dipy`:**
+    *   `input_image_file` (str): Path to the NIFTI file to be corrected.
+    *   `output_corrected_file` (str): Path to save the corrected NIFTI file.
+    *   `method` (str, optional): Correction method, defaults to 'n4'.
+    *   `mask_file` (str, optional): Path to a brain mask. While N4 can use a mask (often improving results by focusing computation on relevant tissue), this wrapper notes that `BiasFieldCorrectionFlow` might not directly pass it for 'n4'. Users might need to provide a pre-masked input image if masked correction is desired.
+    *   `**kwargs`: Additional arguments for Dipý's `BiasFieldCorrectionFlow.run()` (e.g., `threshold`, `use_cuda`, N4-specific parameters like `n_iters`, `convergence_threshold`).
+*   **Returns:** Path to the corrected image file.
+
+*   **Conceptual Example Usage:**
+    ```python
+    # from diffusemri.preprocessing.correction import correct_bias_field_dipy
+    # print("Successfully imported correct_bias_field_dipy.") # Verify import
+
+    # # --- This is a conceptual example. Actual paths and dependencies (Dipy, ANTs/ITK) are needed. ---
+    # # input_image_file: e.g., a T1w image or a mean b0 image from DWI
+    # image_to_correct_path = "path/to/your/image_needing_correction.nii.gz"
+    # # optional_mask_path = "path/to/your/brain_mask.nii.gz" # Optional
+    # output_bias_corrected_path = "path/to/output/image_corrected_n4.nii.gz"
+
+    # try:
+    #     corrected_file = correct_bias_field_dipy(
+    #         input_image_file=image_to_correct_path,
+    #         output_corrected_file=output_bias_corrected_path,
+    #         # mask_file=optional_mask_path, # If providing a mask
+    #         method='n4',
+    #         # Example of passing kwargs for N4, check Dipy docs for specific BiasFieldCorrectionFlow options
+    #         # n_iters="[50,50,30,20]", # Example: N4 iterations schedule
+    #         # convergence_threshold=1e-6,
+    #         verbose=True
+    #     )
+    #     print(f"Bias field corrected image saved to: {corrected_file}")
+    # except RuntimeError as e:
+    #     print(f"Dipý N4 bias field correction requires Dipy and underlying N4 (ANTs/ITK) to be installed and configured. Error: {e}")
+    # except FileNotFoundError as e:
+    #     print(f"One of the input files for N4 bias field correction was not found: {e}")
+    print("Note: The N4 bias field correction example requires Dipý (and its N4 dependencies like ANTs/ITK) installed, input files, and the function imported.")
+    ```
+
+## Gibbs Ringing Correction (Dipý)
+
+*   **Purpose:** To reduce Gibbs ringing artifacts, which are spurious oscillations typically seen near sharp intensity transitions (e.g., tissue interfaces) in MR images. These artifacts arise from the truncation of k-space data during image acquisition.
+*   **Function:** `diffusemri.preprocessing.denoising.correct_gibbs_ringing_dipy()`
+*   **Method:** This function wraps Dipý's `dipy.denoise.gibbs_removal` function. This algorithm works by identifying voxels likely affected by Gibbs ringing based on local total variation (TV) and then correcting their intensities.
+*   **Dependencies:** This feature requires Dipý to be installed.
+*   **Key Parameters for `correct_gibbs_ringing_dipy`:**
+    *   `input_image_file` (str): Path to the NIFTI file to be corrected (can be 3D or 4D).
+    *   `output_corrected_file` (str): Path to save the corrected NIFTI file.
+    *   `slice_axis` (int, optional): Axis along which slices were acquired (0 for X, 1 for Y, 2 for Z). Default is 2.
+    *   `n_points` (int, optional): Number of neighboring points for local TV calculation. Default is 3.
+    *   `num_processes` (int, optional): Number of processes for parallel computation. Default is 1.
+*   **Returns:** Path to the corrected image file.
+
+*   **Conceptual Example Usage:**
+    ```python
+    # from diffusemri.preprocessing.denoising import correct_gibbs_ringing_dipy
+    # print("Successfully imported correct_gibbs_ringing_dipy.") # Verify import
+
+    # # --- This is a conceptual example. Actual paths and Dipý installation are needed. ---
+    # # input_image_file: e.g., a T2w image or a DWI volume susceptible to ringing
+    # image_with_ringing_path = "path/to/your/image_with_ringing.nii.gz"
+    # output_unring_path = "path/to/output/image_unringed.nii.gz"
+
+    # try:
+    #     corrected_file = correct_gibbs_ringing_dipy(
+    #         input_image_file=image_with_ringing_path,
+    #         output_corrected_file=output_unring_path,
+    #         slice_axis=2, # Assuming axial acquisition
+    #         n_points=3,
+    #         num_processes=None # Use None for auto-detection of CPUs by Dipy
+    #     )
+    #     print(f"Gibbs ringing corrected image saved to: {corrected_file}")
+    # except RuntimeError as e:
+    #     print(f"Dipý Gibbs ringing correction failed. Error: {e}")
+    # except FileNotFoundError as e:
+    #     print(f"One of the input files for Gibbs ringing correction was not found: {e}")
+    print("Note: The Gibbs ringing correction example requires Dipý installed, input files, and the function imported.")
     ```
