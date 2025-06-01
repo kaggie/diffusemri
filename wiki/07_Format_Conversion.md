@@ -1,6 +1,6 @@
-# 07: Format Conversion (NRRD & MHD)
+# 07: Format Conversion (NRRD, MHD, Analyze, ISMRMRD)
 
-This section details the functionalities for converting imaging data between NRRD (Nearly Raw Raster Data), MHD (MetaImageHeader), and NIfTI formats, with special considerations for diffusion MRI (dMRI) data.
+This section details the functionalities for converting imaging data between various formats including NRRD (Nearly Raw Raster Data), MHD (MetaImageHeader), Analyze 7.5, ISMRMRD, and NIfTI, with special considerations for diffusion MRI (dMRI) data.
 
 ## NRRD File Support
 
@@ -182,3 +182,107 @@ The `run_format_conversion.py` script also includes subcommands for Analyze 7.5 
         --output_analyze /path/to/output_image.hdr
         # (.img file will be created alongside)
     ```
+
+## ISMRMRD File Support (.h5)
+
+*   **Purpose:** To support reading data from ISMRMRD (International Society for Magnetic Resonance in Medicine Raw Data Format) files, typically HDF5 (`.h5`) files. This format is used for storing raw k-space data and reconstructed image data along with acquisition parameters. The initial goal is to extract usable image volumes and relevant metadata, potentially including DWI information if available and interpretable.
+*   **Current Status:** `Placeholder - Not Implemented`
+*   **Key Functions (Placeholders):**
+    *   `diffusemri.data_io.ismrmrd_utils.read_ismrmrd_file()`: Intended to read an ISMRMRD file and extract image data, affine, DWI information (if possible), and metadata. Currently returns placeholder values.
+    *   `diffusemri.data_io.ismrmrd_utils.convert_ismrmrd_to_nifti_and_metadata()`: Intended to convert ISMRMRD data to NIfTI and save metadata. Currently a placeholder.
+*   **Dependencies:** Requires `ismrmrd` Python package and its underlying HDF5 dependencies. Full implementation will require detailed knowledge of ISMRMRD data structures.
+*   **CLI Tool (Placeholder):** `run_format_conversion ismrmrd_convert`
+    *   **Purpose:** Converts an ISMRMRD file to NIfTI format and extracts metadata.
+    *   **Conceptual CLI Usage (Placeholder):**
+        ```bash
+        python cli/run_format_conversion.py ismrmrd_convert \\
+            --input_ismrmrd /path/to/input.h5 \\
+            --output_base /path/to/output/scan_base
+            # Output might be scan_base.nii.gz, scan_base_metadata.json, etc.
+        ```
+    *   **Note:** This CLI command and its underlying functionality are currently placeholders and not implemented.
+
+## Philips PAR/REC File Support
+
+The library supports reading Philips PAR/REC files (versions 4.0, 4.1, 4.2) using Nibabel. This allows conversion of PAR/REC image data, including DWI information, to NIfTI format.
+
+### Key Functions:
+*   **`diffusemri.data_io.parrec_utils.read_parrec_data()`**:
+    *   Reads image data, affine, b-values, b-vectors (if present), and header information from a PAR/REC file pair.
+    *   Uses `nibabel.load()` with options for `strict_sort` (volume sorting) and `scaling` ('dv' or 'fp').
+    *   Returns image data (as `np.float32`), affine matrix, b-values array (or None), b-vectors array (or None), and a dictionary containing the source header object.
+*   **`diffusemri.data_io.parrec_utils.convert_parrec_to_nifti()`**:
+    *   Orchestrates the conversion from PAR/REC to NIfTI.
+    *   Calls `read_parrec_data` to load the data.
+    *   Saves the image data as a NIfTI file.
+    *   If b-values and b-vectors are extracted, they are saved to specified output text files.
+
+### DWI Metadata in PAR/REC
+Nibabel's PAR/REC loader (`nibabel.parrec.PARRECImage`) handles the extraction of b-values and b-vectors directly from the PAR file header if the acquisition was a diffusion scan. These are made available via the `header.get_bvals_bvecs()` method. The b-vectors are typically provided in an RAS (scanner) coordinate system.
+
+### Command-Line Interface (CLI) for PAR/REC Conversion
+
+The `run_format_conversion.py` script includes a subcommand for PAR/REC to NIfTI conversion.
+
+#### `parrec2nii`: PAR/REC to NIfTI Conversion
+*   **Purpose:** Converts a Philips PAR/REC file pair into NIfTI format. If the PAR/REC is DWI data, it also extracts and saves b-values and b-vectors to separate files.
+*   **CLI Tool:** `run_format_conversion parrec2nii`
+*   **Conceptual CLI Usage:**
+    ```bash
+    # Convert PAR/REC (e.g., anatomical or DWI) to NIfTI
+    python cli/run_format_conversion.py parrec2nii \\
+        --input_parrec /path/to/input_image.par \\
+        --output_nifti /path/to/output_image.nii.gz \\
+        # Optional: specify bval/bvec output paths if DWI is expected
+        --output_bval /path/to/output_dwi.bval \\
+        --output_bvec /path/to/output_dwi.bvec \\
+        # Optional: control PAR/REC loading parameters
+        --scaling_method fp \\
+        --no_strict_sort
+    ```
+*   **Note:** Provide the path to either the `.par` or `.rec` file; Nibabel will locate the corresponding pair.
+
+## NIfTI to DICOM Secondary Capture Conversion
+
+DICOM Secondary Capture (SC) format is used to store image data that is not directly acquired from a modality but is derived or converted from other image formats. This is useful for integrating images from various sources into a PACS environment.
+
+The `diffusemri` library provides a utility to convert 3D or 4D NIfTI images into a series of DICOM Secondary Capture files.
+
+### Key Function:
+*   **`diffusemri.data_io.dicom_utils.write_nifti_to_dicom_secondary()`**:
+    *   Takes a `nibabel.Nifti1Image` object (3D or 4D) and an output directory.
+    *   For 3D NIfTI, each slice becomes a separate DICOM SC instance.
+    *   For 4D NIfTI, each slice within each volume becomes a separate DICOM SC instance, with instance numbers incrementing accordingly.
+    *   Populates essential DICOM tags including Patient Information, Study/Series UIDs, SOP Class UID (Secondary Capture Image Storage), and image pixel data characteristics.
+    *   Allows customization of several DICOM tags through parameters.
+
+### Command-Line Interface (CLI) for NIfTI to DICOM SC Conversion
+
+The `run_format_conversion.py` script includes a subcommand for this conversion.
+
+#### `nii2dicom_sec`: NIfTI to DICOM Secondary Capture
+*   **Purpose:** Converts a 3D or 4D NIfTI file into a series of DICOM Secondary Capture files, which are saved in a specified output directory.
+*   **CLI Tool:** `run_format_conversion nii2dicom_sec`
+*   **Conceptual CLI Usage:**
+    ```bash
+    python cli/run_format_conversion.py nii2dicom_sec \\
+        --input_nifti /path/to/input_image.nii.gz \\
+        --output_dicom_dir /path/to/output_dicom_series_directory/ \\
+        --patient-id "PAT001" \\
+        --study-uid "1.2.826.0.1.3680043.8.498.12345" \\
+        --series-uid "1.2.826.0.1.3680043.8.498.54321" \\
+        --series-description "Converted NIfTI" \\
+        --series-number 101 \\
+        --create-dirs
+    ```
+*   **Key Arguments:**
+    *   `--input_nifti`: Path to the input NIfTI file (.nii, .nii.gz).
+    *   `--output_dicom_dir`: Directory where the output DICOM files will be saved.
+    *   `--patient-id` (optional): Patient ID for the DICOM files. Default: "Anonymous".
+    *   `--study-uid` (optional): Study Instance UID. If not provided, a new UID will be generated.
+    *   `--series-uid` (optional): Series Instance UID. If not provided, a new UID will be generated.
+    *   `--series-description` (optional): Series Description. Default: "NIfTI Secondary Capture".
+    *   `--series-number` (optional): Series Number. Default: 999.
+    *   `--sop-instance-uid-prefix` (optional): Custom prefix for SOP Instance UIDs.
+    *   `--initial-instance-number` (optional): Starting instance number for the DICOM series. Default: 1.
+    *   `--create-dirs` (flag): Create the output directory if it doesn't exist.

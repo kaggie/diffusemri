@@ -5,10 +5,21 @@ import tempfile
 import numpy as np # Added for np.array in mock returns
 import argparse
 
+import nibabel as nib # Added for NIfTI creation
+
 # Adjust import path based on actual project structure
 from cli import run_format_conversion
 
 class TestCliFormatConversion(unittest.TestCase):
+
+    def _create_dummy_nifti_file(self, directory, filename="test.nii.gz", shape=(5,5,5)):
+        """Helper to create a dummy NIfTI file in the given directory."""
+        nifti_path = os.path.join(directory, filename)
+        data = np.random.randint(0, 100, size=shape, dtype=np.uint8)
+        affine = np.eye(4)
+        img = nib.Nifti1Image(data, affine)
+        nib.save(img, nifti_path)
+        return nifti_path
 
     @mock.patch('cli.run_format_conversion.read_nrrd_data')
     @mock.patch('cli.run_format_conversion.save_nifti_data') # This is from data_io.cli_utils via diffusemri
@@ -268,6 +279,120 @@ class TestCliFormatConversion(unittest.TestCase):
             np.testing.assert_array_equal(call_kwargs['data'], mock_img_instance.get_fdata.return_value)
             np.testing.assert_array_equal(call_kwargs['affine'], mock_img_instance.affine)
             self.assertEqual(call_kwargs['header'], mock_img_instance.header)
+
+
+    @mock.patch('cli.run_format_conversion.convert_ismrmrd_to_nifti_and_metadata')
+    @mock.patch('builtins.print') # To capture print statements
+    def test_cli_ismrmrd_convert_placeholder(self, mock_print, mock_convert_ismrmrd):
+        mock_convert_ismrmrd.return_value = False # As per placeholder implementation
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_ismrmrd = os.path.join(tmpdir, "input.h5")
+            output_base = os.path.join(tmpdir, "output_scan")
+            open(input_ismrmrd, 'a').close() # Create dummy file
+
+            cli_args = [
+                'ismrmrd_convert',
+                '--input_ismrmrd', input_ismrmrd,
+                '--output_base', output_base
+            ]
+
+            # The main function might call sys.exit(1) on failure,
+            # but for a placeholder, we expect it to run through and print messages.
+            # The placeholder function itself returns False.
+            # The CLI handler `run_ismrmrd_convert` prints messages but doesn't sys.exit(1) for placeholder.
+            run_format_conversion.main(cli_args)
+
+            mock_convert_ismrmrd.assert_called_once_with(input_ismrmrd, output_base)
+
+            # Check if appropriate placeholder messages were printed
+            # This depends on the exact print statements in the CLI handler
+            printed_output = "".join(call_args[0][0] for call_args in mock_print.call_args_list)
+            self.assertIn("Attempting ISMRMRD conversion", printed_output)
+            self.assertIn("This functionality is currently a placeholder", printed_output)
+            self.assertIn("Placeholder ISMRMRD conversion 'failed'", printed_output)
+
+    @mock.patch('cli.run_format_conversion.convert_parrec_to_nifti')
+    def test_cli_parrec_to_nifti(self, mock_convert_parrec, tmp_path):
+        mock_convert_parrec.return_value = True # Assume success
+
+        input_parrec = tmp_path / "input.par"
+        output_nifti = tmp_path / "output_from_parrec.nii.gz"
+        output_bval = tmp_path / "output_from_parrec.bval"
+        output_bvec = tmp_path / "output_from_parrec.bvec"
+        input_parrec.touch()
+
+        cli_args = [
+            'parrec2nii',
+            '--input_parrec', str(input_parrec),
+            '--output_nifti', str(output_nifti),
+            '--output_bval', str(output_bval),
+            '--output_bvec', str(output_bvec),
+            '--scaling_method', 'fp',
+            '--no_strict_sort' # Test flag
+        ]
+        try:
+            run_format_conversion.main(cli_args)
+        except SystemExit as e:
+            self.fail(f"CLI script parrec2nii exited unexpectedly: {e.code}")
+
+        mock_convert_parrec.assert_called_once_with(
+            parrec_filepath=str(input_parrec),
+            output_nifti_file=str(output_nifti),
+            output_bval_file=str(output_bval),
+            output_bvec_file=str(output_bvec),
+            strict_sort=False, # Due to --no_strict_sort
+            scaling='fp'
+        )
+
+    @mock.patch('cli.run_format_conversion.nib.load') # To control the loaded NIfTI image
+    @mock.patch('cli.run_format_conversion.write_nifti_to_dicom_secondary')
+    def test_cli_nifti_to_dicom_secondary(self, mock_write_secondary, mock_nib_load, tmp_path):
+        # Create a dummy NIfTI file for input
+        input_nifti_path = self._create_dummy_nifti_file(tmp_path, "input_for_dicom.nii.gz")
+
+        # Mock nib.load to return a known Nifti1Image object
+        # This is important because the CLI function calls nib.load() and passes the image object
+        mock_nifti_img = nib.Nifti1Image(np.random.rand(5,5,5), np.eye(4))
+        mock_nib_load.return_value = mock_nifti_img
+
+        output_dicom_dir = tmp_path / "dicom_out"
+        # output_dicom_dir does not need to exist for the mocked function,
+        # but in a real scenario, the function would create it or expect it.
+
+        cli_args = [
+            'nii2dicom_sec',
+            '--input_nifti', str(input_nifti_path),
+            '--output_dicom_dir', str(output_dicom_dir),
+            '--patient-id', 'TestPatient001',
+            '--study-uid', 'TestStudy123',
+            '--series-uid', 'TestSeries456',
+            '--series-description', 'Secondary Capture Test',
+            '--series-number', '99',
+            '--create-dirs' # Test a flag
+        ]
+
+        try:
+            run_format_conversion.main(cli_args)
+        except SystemExit as e:
+            self.fail(f"CLI script nii2dicom_sec exited unexpectedly: {e.code} with args {cli_args}")
+
+        mock_nib_load.assert_called_once_with(str(input_nifti_path))
+
+        mock_write_secondary.assert_called_once()
+        call_args = mock_write_secondary.call_args
+
+        # Check positional arguments
+        self.assertIs(call_args[0][0], mock_nifti_img) # Arg 0 is the nifti_image object
+        self.assertEqual(call_args[0][1], str(output_dicom_dir)) # Arg 1 is output_dir
+
+        # Check keyword arguments
+        self.assertEqual(call_args[1]['patient_id'], 'TestPatient001')
+        self.assertEqual(call_args[1]['study_uid'], 'TestStudy123')
+        self.assertEqual(call_args[1]['series_uid'], 'TestSeries456')
+        self.assertEqual(call_args[1]['series_description'], 'Secondary Capture Test')
+        self.assertEqual(call_args[1]['series_number'], 99) # Should be int
+        self.assertTrue(call_args[1]['create_dirs'])
 
 
 if __name__ == '__main__':

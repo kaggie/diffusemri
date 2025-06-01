@@ -108,8 +108,17 @@ This document details the current features and status of the `diffusemri` librar
 *   **`run_nifti_to_analyze(args: argparse.Namespace)`**
     *   Description: Converts a NIfTI file to Analyze 7.5 format (.hdr/.img).
     *   Status: `Implemented`
+*   **`run_ismrmrd_convert(args: argparse.Namespace)`**
+    *   Description: Placeholder CLI for converting ISMRMRD files to NIfTI and extracting metadata.
+    *   Status: `Placeholder - Not Implemented`
+*   **`run_parrec_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts a Philips PAR/REC file to NIfTI format, extracting DWI information if available.
+    *   Status: `Implemented`
+*   **`run_nifti_to_dicom_secondary(args: argparse.Namespace)`**
+    *   Description: Converts a 3D or 4D NIfTI file to a series of DICOM Secondary Capture files.
+    *   Status: `Implemented`
 *   **`main()`**
-    *   Description: Command-line interface entry point for format conversion tasks (NRRD, MHD, Analyze <-> NIfTI).
+    *   Description: Command-line interface entry point for format conversion tasks (NRRD, MHD, Analyze, ISMRMRD, PAR/REC <-> NIfTI, NIfTI to DICOM SC).
     *   Status: `Implemented`
 
 ### `cli.run_tracking`
@@ -159,6 +168,9 @@ This document details the current features and status of the `diffusemri` librar
     *   Status: `Implemented`
 *   **`anonymize_dicom_directory(input_dir: str, output_dir: str, anonymization_rules: dict = None, custom_replacements: dict = None, preserve_structure: bool = True) -> tuple[int, int]`**
     *   Description: Anonymizes all DICOM files in a directory, optionally preserving structure.
+    *   Status: `Implemented`
+*   **`write_nifti_to_dicom_secondary(nifti_image: nib.Nifti1Image, output_dir: str, patient_id: str = "Anonymous", study_uid: Optional[str] = None, series_uid: Optional[str] = None, series_description: str = "NIfTI Secondary Capture", series_number: int = 999, sop_instance_uid_prefix: Optional[str] = None, implementation_class_uid_prefix: Optional[str] = None, initial_instance_number: int = 1, create_dirs: bool = True) -> list[str]`**
+    *   Description: Converts a NIfTI image object (3D or 4D) into a series of DICOM Secondary Capture files, saving them in the specified output directory.
     *   Status: `Implemented`
 
 ### `data_io.gradients`
@@ -211,6 +223,36 @@ This document details the current features and status of the `diffusemri` librar
 *   **`write_analyze_data(output_filepath: str, data: np.ndarray, affine: np.ndarray, header: nib.analyze.AnalyzeHeader = None)`**
     *   Description: Writes image data to Analyze 7.5 format using Nibabel.
     *   Status: `Implemented (Wraps Nibabel)`
+
+### `data_io.ismrmrd_utils`
+*   **`read_ismrmrd_file(filepath: str) -> tuple`**
+    *   Description: Placeholder for reading ISMRMRD files. Intended to extract image/k-space data and metadata.
+    *   Status: `Placeholder - Not Implemented`
+*   **`convert_ismrmrd_to_nifti_and_metadata(ismrmrd_filepath: str, output_nifti_base: str) -> bool`**
+    *   Description: Placeholder for converting ISMRMRD data to NIfTI and extracting metadata.
+    *   Status: `Placeholder - Not Implemented`
+
+### `data_io.parrec_utils`
+*   **`read_parrec_data(parrec_filepath: str, strict_sort: bool = True, scaling: str = 'dv') -> tuple`**
+    *   Description: Reads Philips PAR/REC files using Nibabel, returning image data, affine, bvals/bvecs (if DWI), and header.
+    *   Status: `Implemented (Wraps Nibabel)`
+*   **`convert_parrec_to_nifti(parrec_filepath: str, output_nifti_file: str, output_bval_file: str = None, output_bvec_file: str = None, strict_sort: bool = True, scaling: str = 'dv') -> bool`**
+    *   Description: Converts PAR/REC data to NIfTI, saving bvals/bvecs if present and output paths provided.
+    *   Status: `Implemented`
+
+### `data_io.generic_utils`
+*   **`save_dict_to_hdf5(data_dict: dict, hdf5_filepath: str)`**
+    *   Description: Saves a dictionary of NumPy arrays to an HDF5 file.
+    *   Status: `Implemented (Wraps h5py)`
+*   **`load_dict_from_hdf5(hdf5_filepath: str) -> dict`**
+    *   Description: Loads data from an HDF5 file into a dictionary of NumPy arrays.
+    *   Status: `Implemented (Wraps h5py)`
+*   **`save_dict_to_mat(data_dict: dict, mat_filepath: str, oned_as: str = 'column')`**
+    *   Description: Saves a dictionary of NumPy arrays to a .MAT file (version 5).
+    *   Status: `Implemented (Wraps SciPy)`
+*   **`load_dict_from_mat(mat_filepath: str) -> dict`**
+    *   Description: Loads data from a .MAT file into a dictionary, filtering MAT-specific metadata.
+    *   Status: `Implemented (Wraps SciPy)`
 
 ## Fitting
 

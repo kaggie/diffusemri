@@ -7,7 +7,10 @@ import nibabel as nib
 try:
     from diffusemri.data_io.nrrd_utils import read_nrrd_data, write_nrrd_data
     from diffusemri.data_io.mhd_utils import read_mhd_data, write_mhd_data
-    from diffusemri.data_io.analyze_utils import read_analyze_data, write_analyze_data # Added Analyze utils
+    from diffusemri.data_io.analyze_utils import read_analyze_data, write_analyze_data
+    from diffusemri.data_io.ismrmrd_utils import convert_ismrmrd_to_nifti_and_metadata
+    from diffusemri.data_io.parrec_utils import convert_parrec_to_nifti
+    from diffusemri.data_io.dicom_utils import write_nifti_to_dicom_secondary # Added for nii2dicom_sec
     from diffusemri.data_io.cli_utils import save_nifti_data
 except ImportError:
     # Fallback for direct script execution if diffusemri is not in PYTHONPATH
@@ -17,7 +20,10 @@ except ImportError:
         sys.path.insert(0, parent_dir)
     from data_io.nrrd_utils import read_nrrd_data, write_nrrd_data
     from data_io.mhd_utils import read_mhd_data, write_mhd_data
-    from data_io.analyze_utils import read_analyze_data, write_analyze_data # Added Analyze utils
+    from data_io.analyze_utils import read_analyze_data, write_analyze_data
+    from data_io.ismrmrd_utils import convert_ismrmrd_to_nifti_and_metadata
+    from data_io.parrec_utils import convert_parrec_to_nifti
+    from data_io.dicom_utils import write_nifti_to_dicom_secondary # Added for nii2dicom_sec
     from data_io.cli_utils import save_nifti_data
 
 
@@ -173,6 +179,30 @@ def main():
     )
     setup_nifti_to_analyze_parser(nii_to_analyze_parser)
 
+    # --- ISMRMRD to NIfTI Subcommand (Placeholder) ---
+    ismrmrd_to_nii_parser = subparsers.add_parser(
+        "ismrmrd_convert",
+        help="Convert ISMRMRD file to NIfTI format (placeholder).",
+        description="Converts ISMRMRD to NIfTI and extracts metadata. This is currently a placeholder."
+    )
+    setup_ismrmrd_convert_parser(ismrmrd_to_nii_parser)
+
+    # --- PAR/REC to NIfTI Subcommand ---
+    parrec_to_nii_parser = subparsers.add_parser(
+        "parrec2nii", # Alias for parrec_to_nifti
+        help="Convert Philips PAR/REC file to NIfTI format.",
+        description="Converts PAR/REC to NIfTI, extracting DWI bvals/bvecs if available."
+    )
+    setup_parrec_to_nifti_parser(parrec_to_nii_parser)
+
+    # --- NIfTI to DICOM Secondary Capture Subcommand ---
+    nii_to_dicom_sec_parser = subparsers.add_parser(
+        "nii2dicom_sec",
+        help="Convert NIfTI file to DICOM Secondary Capture series.",
+        description="Converts a NIfTI volume into a series of DICOM Secondary Capture files."
+    )
+    setup_nifti_to_dicom_secondary_parser(nii_to_dicom_sec_parser)
+
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -315,4 +345,90 @@ def run_nifti_to_analyze(args):
         print("NIfTI to Analyze conversion successful.")
     except Exception as e:
         print(f"Error during NIfTI to Analyze conversion: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# --- ISMRMRD to NIfTI (Placeholder) ---
+def setup_ismrmrd_convert_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_ismrmrd', required=True, help="Path to the input ISMRMRD file (.h5).")
+    parser.add_argument('--output_base', required=True, help="Base path/filename for output NIfTI and metadata files (e.g., 'output/my_scan').")
+    parser.set_defaults(func=run_ismrmrd_convert)
+
+def run_ismrmrd_convert(args):
+    print(f"Attempting ISMRMRD conversion for: {args.input_ismrmrd}")
+    print("Note: This functionality is currently a placeholder and not fully implemented.")
+    success = convert_ismrmrd_to_nifti_and_metadata(args.input_ismrmrd, args.output_base)
+    if success:
+        print(f"Placeholder ISMRMRD conversion 'completed' for base: {args.output_base}")
+    else:
+        print(f"Placeholder ISMRMRD conversion 'failed' for base: {args.output_base} (as expected for placeholder).")
+        # sys.exit(1) # Do not exit with error for a placeholder
+
+
+# --- PAR/REC to NIfTI ---
+def setup_parrec_to_nifti_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_parrec', required=True, help="Path to the input PAR or REC file.")
+    parser.add_argument('--output_nifti', required=True, help="Path to save the output NIfTI file.")
+    parser.add_argument('--output_bval', help="Path to save the output b-values file (if DWI).")
+    parser.add_argument('--output_bvec', help="Path to save the output b-vectors file (if DWI).")
+    parser.add_argument('--strict_sort', action='store_true', default=True,
+                        help="Use strict volume sorting for PAR/REC (default: True).")
+    parser.add_argument('--no_strict_sort', action='store_false', dest='strict_sort',
+                        help="Disable strict volume sorting for PAR/REC.")
+    parser.add_argument('--scaling_method', default='dv', choices=['dv', 'fp'],
+                        help="Scaling method for PAR/REC data ('dv' or 'fp', default: 'dv').")
+    parser.set_defaults(func=run_parrec_to_nifti)
+
+def run_parrec_to_nifti(args):
+    print(f"Converting PAR/REC file: {args.input_parrec} to NIfTI: {args.output_nifti}")
+    try:
+        success = convert_parrec_to_nifti(
+            parrec_filepath=args.input_parrec,
+            output_nifti_file=args.output_nifti,
+            output_bval_file=args.output_bval,
+            output_bvec_file=args.output_bvec,
+            strict_sort=args.strict_sort,
+            scaling=args.scaling_method
+        )
+        if success:
+            print("PAR/REC to NIfTI conversion successful.")
+        else:
+            print("PAR/REC to NIfTI conversion failed.", file=sys.stderr)
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"Error during PAR/REC to NIfTI conversion: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# --- NIfTI to DICOM Secondary Capture ---
+def setup_nifti_to_dicom_secondary_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_nifti', required=True, help="Path to the input NIfTI file.")
+    parser.add_argument('--output_dicom_dir', required=True, help="Path to the output directory for DICOM slices.")
+    parser.add_argument('--series_description', default="Processed NIfTI Image", help="Series Description for DICOM tags.")
+    parser.add_argument('--rescale_slope', type=float, default=1.0, help="Rescale Slope for pixel data scaling.")
+    parser.add_argument('--rescale_intercept', type=float, default=0.0, help="Rescale Intercept for pixel data scaling.")
+    parser.add_argument('--window_center', type=float, help="Window Center for DICOM display.")
+    parser.add_argument('--window_width', type=float, help="Window Width for DICOM display.")
+    parser.set_defaults(func=run_nifti_to_dicom_secondary)
+
+def run_nifti_to_dicom_secondary(args):
+    print(f"Converting NIfTI file: {args.input_nifti} to DICOM Secondary Capture series in: {args.output_dicom_dir}")
+    try:
+        success = write_nifti_to_dicom_secondary(
+            nifti_filepath=args.input_nifti,
+            output_dicom_dir=args.output_dicom_dir,
+            series_description=args.series_description,
+            rescale_slope=args.rescale_slope,
+            rescale_intercept=args.rescale_intercept,
+            window_center=args.window_center,
+            window_width=args.window_width
+        )
+        if success:
+            print("NIfTI to DICOM Secondary Capture conversion successful.")
+        else:
+            print("NIfTI to DICOM Secondary Capture conversion failed.", file=sys.stderr)
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error during NIfTI to DICOM Secondary Capture conversion: {e}", file=sys.stderr)
         sys.exit(1)

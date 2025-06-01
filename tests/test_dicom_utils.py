@@ -15,8 +15,10 @@ from data_io.dicom_utils import (
     read_dicom_series, extract_pixel_data_and_affine, convert_dicom_to_nifti_main,
     extract_dwi_metadata, convert_dwi_dicom_to_nifti,
     anonymize_dicom_dataset, anonymize_dicom_file, anonymize_dicom_directory,
-    DEFAULT_ANONYMIZATION_TAGS, _REMOVE_TAG_, _EMPTY_STRING_, _ZERO_STRING_, _DEFAULT_DATE_, _DEFAULT_TIME_
+    DEFAULT_ANONYMIZATION_TAGS, _REMOVE_TAG_, _EMPTY_STRING_, _ZERO_STRING_, _DEFAULT_DATE_, _DEFAULT_TIME_,
+    write_nifti_to_dicom_secondary # Added import
 )
+from pydicom import uid as pydicom_uid # Added import for SOP Class UID
 
 # Helper to create a dummy DICOM dataset
 def create_dummy_dicom_dataset(filename="test.dcm", instance_number=1, series_uid="1.2.3",

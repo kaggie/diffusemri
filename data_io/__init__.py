@@ -28,8 +28,17 @@ __all__ = [
     'write_nrrd_data',
     'read_mhd_data',
     'write_mhd_data',
-    'read_analyze_data',           # Added from analyze_utils
-    'write_analyze_data'           # Added from analyze_utils
+    'read_analyze_data',
+    'write_analyze_data',
+    'read_ismrmrd_file',
+    'convert_ismrmrd_to_nifti_and_metadata',
+    'read_parrec_data',
+    'convert_parrec_to_nifti',
+    'save_dict_to_hdf5',
+    'load_dict_from_hdf5',
+    'save_dict_to_mat',
+    'load_dict_from_mat',
+    'write_nifti_to_dicom_secondary' # Added from dicom_utils
 ]
 
 # Import from dicom_utils
@@ -38,7 +47,8 @@ try:
         convert_dicom_to_nifti_main,
         convert_dwi_dicom_to_nifti,
         anonymize_dicom_file,
-        anonymize_dicom_directory
+        anonymize_dicom_directory,
+        write_nifti_to_dicom_secondary # Ensure it's imported
     )
 except ImportError:
     pass # Handled by top-level __init__ or direct use
@@ -58,5 +68,26 @@ except ImportError:
 # Import from analyze_utils
 try:
     from .analyze_utils import read_analyze_data, write_analyze_data
+except ImportError:
+    pass
+
+# Import from ismrmrd_utils
+try:
+    from .ismrmrd_utils import read_ismrmrd_file, convert_ismrmrd_to_nifti_and_metadata
+except ImportError:
+    pass
+
+# Import from parrec_utils
+try:
+    from .parrec_utils import read_parrec_data, convert_parrec_to_nifti
+except ImportError:
+    pass
+
+# Import from generic_utils
+try:
+    from .generic_utils import (
+        save_dict_to_hdf5, load_dict_from_hdf5,
+        save_dict_to_mat, load_dict_from_mat
+    )
 except ImportError:
     pass

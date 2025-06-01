@@ -312,10 +312,24 @@ The library provides tools for handling DICOM data:
     *   Basic conversion between NIfTI and Analyze 7.5 formats (`.hdr`/`.img`).
     *   Note: Analyze 7.5 has limited support for orientation and no standard DWI metadata.
     *   Relevant functions: `diffusemri.data_io.analyze_utils.read_analyze_data()`, `diffusemri.data_io.analyze_utils.write_analyze_data()`.
+*   **Philips PAR/REC Format Conversion**:
+    *   Conversion of Philips PAR/REC files to NIfTI, including DWI metadata (b-values/b-vectors) extraction.
+    *   Relevant functions: `diffusemri.data_io.parrec_utils.read_parrec_data()`, `diffusemri.data_io.parrec_utils.convert_parrec_to_nifti()`.
+*   **ISMRMRD Format Support (Placeholder)**:
+    *   Basic placeholder functions for reading ISMRMRD `.h5` files are included. Full implementation for image and k-space data extraction is planned for future development.
+    *   Relevant functions: `diffusemri.data_io.ismrmrd_utils.read_ismrmrd_file()`.
+*   **NIfTI to DICOM Secondary Capture Conversion**:
+    *   Converts 3D or 4D NIfTI files into a series of DICOM Secondary Capture files.
+    *   Useful for integrating NIfTI-based images into PACS systems.
+    *   Relevant function: `diffusemri.data_io.dicom_utils.write_nifti_to_dicom_secondary()`.
+*   **Generic HDF5 and .MAT I/O**:
+    *   Utilities to save and load dictionaries of NumPy arrays to/from HDF5 (`.h5`) and MATLAB (`.mat`) files.
+    *   Useful for storing intermediate results or collections of processed data.
+    *   Relevant functions: `diffusemri.data_io.generic_utils.save_dict_to_hdf5()`, `load_dict_from_hdf5()`, `save_dict_to_mat()`, `load_dict_from_mat()`.
 *   **Format Conversion CLI**:
-    *   The `run_format_conversion` CLI tool provides subcommands for `nrrd2nii`, `nii2nrrd`, `mhd2nii`, `nii2mhd`, `analyze2nii`, and `nii2analyze`.
+    *   The `run_format_conversion` CLI tool provides subcommands for `nrrd2nii`, `nii2nrrd`, `mhd2nii`, `nii2mhd`, `analyze2nii`, `nii2analyze`, `parrec2nii`, `nii2dicom_sec`, and a placeholder for `ismrmrd_convert`.
 
-For more details on these preprocessing tools and DICOM/NRRD/MHD/Analyze utilities, including their command-line interfaces, please refer to the [Preprocessing Tools Wiki](wiki/01_Preprocessing_Tools.md) and the [Format Conversion Wiki](wiki/07_Format_Conversion.md).
+For more details on these preprocessing tools and various data format utilities (DICOM, NRRD, MHD, Analyze, PAR/REC, ISMRMRD, HDF5, MAT), including their command-line interfaces, please refer to the [Preprocessing Tools Wiki](wiki/01_Preprocessing_Tools.md), the [Format Conversion Wiki](wiki/07_Format_Conversion.md), and the [Generic Data I/O Wiki](wiki/08_Generic_Data_IO_HDF5_MAT.md).
 
 ## Tractography
 
