@@ -59,8 +59,57 @@ This document details the current features and status of the `diffusemri` librar
 *   **`run_correct_fsl(args: argparse.Namespace)`**
     *   Description: Performs motion and eddy current correction by wrapping FSL's `eddy` tool via Nipype.
     *   Status: `Implemented (Relies on FSL)`
+*   **`run_topup_fsl(args: argparse.Namespace)`**
+    *   Description: Performs susceptibility distortion correction using FSL's TOPUP and ApplyTOPUP.
+    *   Status: `Implemented (Relies on FSL)`
+*   **`run_bias_field_correction_dipy(args: argparse.Namespace)`**
+    *   Description: Performs bias field correction using Dipý's BiasFieldCorrectionFlow (e.g., N4 method).
+    *   Status: `Implemented (Wraps Dipy)`
+*   **`run_gibbs_ringing_correction_dipy(args: argparse.Namespace)`**
+    *   Description: Performs Gibbs ringing correction using Dipý's `gibbs_removal` function.
+    *   Status: `Implemented (Wraps Dipy)`
+*   **`run_dicom_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts DICOM series to NIfTI format, with options for DWI data (bvals/bvecs).
+    *   Status: `Implemented`
+*   **`run_anonymize_dicom(args: argparse.Namespace)`**
+    *   Description: Anonymizes DICOM files (single or directory) by editing tags based on default or custom rules.
+    *   Status: `Implemented`
 *   **`main()`**
-    *   Description: Command-line interface entry point for various preprocessing tasks (masking, denoising, FSL correction). Uses subparsers for each task.
+    *   Description: Command-line interface entry point for various preprocessing tasks including DICOM utilities. Uses subparsers for each task.
+    *   Status: `Implemented`
+
+### `cli.run_format_conversion`
+*   **`run_nrrd_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts a NRRD file to NIfTI format, optionally extracting DWI information (bvals/bvecs) if present in NRRD header.
+    *   Status: `Implemented`
+*   **`run_nifti_to_nrrd(args: argparse.Namespace)`**
+    *   Description: Converts a NIfTI file to NRRD format, optionally embedding DWI bvals/bvecs from text files into NRRD header.
+    *   Status: `Implemented`
+*   **`main()`**
+    *   Description: Command-line interface entry point for format conversion tasks (NRRD <-> NIfTI).
+    *   Status: `Implemented`
+
+### `cli.run_format_conversion`
+*   **`run_nrrd_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts a NRRD file to NIfTI format, optionally extracting DWI information (bvals/bvecs) if present in NRRD header.
+    *   Status: `Implemented`
+*   **`run_nifti_to_nrrd(args: argparse.Namespace)`**
+    *   Description: Converts a NIfTI file to NRRD format, optionally embedding DWI bvals/bvecs from text files into NRRD header.
+    *   Status: `Implemented`
+*   **`run_mhd_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts a MHD/MHA file to NIfTI format, optionally extracting DWI information (bvals/bvecs) if present in MHD header.
+    *   Status: `Implemented`
+*   **`run_nifti_to_mhd(args: argparse.Namespace)`**
+    *   Description: Converts a NIfTI file to MHD/MHA format, optionally embedding DWI bvals/bvecs from text files into MHD header.
+    *   Status: `Implemented`
+*   **`run_analyze_to_nifti(args: argparse.Namespace)`**
+    *   Description: Converts an Analyze 7.5 file (.hdr/.img) to NIfTI format.
+    *   Status: `Implemented`
+*   **`run_nifti_to_analyze(args: argparse.Namespace)`**
+    *   Description: Converts a NIfTI file to Analyze 7.5 format (.hdr/.img).
+    *   Status: `Implemented`
+*   **`main()`**
+    *   Description: Command-line interface entry point for format conversion tasks (NRRD, MHD, Analyze <-> NIfTI).
     *   Status: `Implemented`
 
 ### `cli.run_tracking`
@@ -75,6 +124,42 @@ This document details the current features and status of the `diffusemri` librar
     *   Status: `Implemented`
 
 ## Data I/O
+
+### `data_io.gradients`
+*   **`create_gradient_table(bvals: np.ndarray, bvecs: np.ndarray, b0_threshold: float = 50.0, atol: float = 1e-2) -> dipy.core.gradients.GradientTable`**
+    *   Description: Creates a Dipy `GradientTable` object from b-values and b-vectors arrays, with input validation.
+    *   Status: `Implemented (Wraps Dipy)`
+
+### `data_io.load_dmri`
+*   **`load_nifti_dmri_data(nifti_filepath: str, bval_filepath: str, bvec_filepath: str) -> tuple`**
+    *   Description: Loads dMRI data from a NIFTI file, b-values, and b-vectors. It handles basic validation like checking 4D NIFTI, matching number of volumes with b-values/vectors, and transposing FSL-style b-vectors. Returns `(image_data, b_values, b_vectors)` or `(None, None, None)` on error.
+    *   Status: `Implemented`
+
+### `data_io.dicom_utils`
+*   **`read_dicom_series(dicom_dir: str) -> list[pydicom.FileDataset]`**
+    *   Description: Reads and sorts DICOM files from a directory.
+    *   Status: `Implemented`
+*   **`extract_pixel_data_and_affine(sorted_dicoms: list[pydicom.FileDataset]) -> tuple[np.ndarray | None, np.ndarray | None, dict]`**
+    *   Description: Extracts pixel data, constructs affine, and gathers basic metadata from DICOM series.
+    *   Status: `Implemented`
+*   **`extract_dwi_metadata(sorted_dicoms: list[pydicom.FileDataset], image_orientation_patient: list[float]) -> tuple[np.ndarray | None, np.ndarray | None, dict]`**
+    *   Description: Extracts b-values, b-vectors (reoriented to image space), and DWI metadata from DICOM series.
+    *   Status: `Implemented`
+*   **`convert_dicom_to_nifti_main(dicom_dir: str, output_nifti_file: str) -> bool`**
+    *   Description: Orchestrates non-DWI DICOM to NIfTI conversion, saving image and a JSON metadata sidecar.
+    *   Status: `Implemented`
+*   **`convert_dwi_dicom_to_nifti(dicom_dir: str, output_nifti_file: str, output_bval_file: str, output_bvec_file: str) -> bool`**
+    *   Description: Orchestrates DWI DICOM to NIfTI conversion, saving image, bvals, bvecs, and a JSON metadata sidecar.
+    *   Status: `Implemented`
+*   **`anonymize_dicom_dataset(dataset: pydicom.FileDataset, anonymization_rules: dict = None, custom_replacements: dict = None) -> None`**
+    *   Description: Anonymizes a DICOM dataset in-place based on specified rules (default or custom).
+    *   Status: `Implemented`
+*   **`anonymize_dicom_file(input_dicom_path: str, output_dicom_path: str, anonymization_rules: dict = None, custom_replacements: dict = None) -> bool`**
+    *   Description: Reads, anonymizes, and saves a single DICOM file.
+    *   Status: `Implemented`
+*   **`anonymize_dicom_directory(input_dir: str, output_dir: str, anonymization_rules: dict = None, custom_replacements: dict = None, preserve_structure: bool = True) -> tuple[int, int]`**
+    *   Description: Anonymizes all DICOM files in a directory, optionally preserving structure.
+    *   Status: `Implemented`
 
 ### `data_io.gradients`
 *   **`create_gradient_table(bvals: np.ndarray, bvecs: np.ndarray, b0_threshold: float = 50.0, atol: float = 1e-2) -> dipy.core.gradients.GradientTable`**
@@ -102,6 +187,30 @@ This document details the current features and status of the `diffusemri` librar
 *   **`load_nifti_study(dwi_path: str, bval_path: str, bvec_path: str, mask_path: str = None, b0_threshold: float = 50.0, atol: float = 1e-2) -> tuple[np.ndarray, dipy.core.gradients.GradientTable, np.ndarray | None, np.ndarray]`**
     *   Description: Loads a complete dMRI study (DWI, bvals, bvecs, optional mask) and returns DWI data, Dipy GradientTable, optional mask data, and DWI affine. Includes consistency checks.
     *   Status: `Implemented`
+
+### `data_io.nrrd_utils`
+*   **`read_nrrd_data(nrrd_filepath: str) -> tuple`**
+    *   Description: Reads NRRD files, attempting to parse image data, NIfTI-compatible affine, DWI metadata (bvals/bvecs), and the full header.
+    *   Status: `Implemented (Wraps nrrd)`
+*   **`write_nrrd_data(output_filepath: str, data: np.ndarray, affine: np.ndarray, bvals: np.ndarray = None, bvecs: np.ndarray = None, custom_fields: dict = None, nrrd_header_options: dict = None)`**
+    *   Description: Writes image data to NRRD format, constructing a header from affine, optional DWI info, and custom fields.
+    *   Status: `Implemented (Wraps nrrd)`
+
+### `data_io.mhd_utils`
+*   **`read_mhd_data(mhd_filepath: str) -> tuple`**
+    *   Description: Reads MHD/MHA files using SimpleITK, parses image data, NIfTI-compatible affine, DWI metadata, and header.
+    *   Status: `Implemented (Wraps SimpleITK)`
+*   **`write_mhd_data(output_filepath: str, data: np.ndarray, affine: np.ndarray, bvals: np.ndarray = None, bvecs: np.ndarray = None, custom_metadata: dict = None)`**
+    *   Description: Writes image data to MHD/MHA format using SimpleITK, constructing header from affine and optional DWI/custom metadata.
+    *   Status: `Implemented (Wraps SimpleITK)`
+
+### `data_io.analyze_utils`
+*   **`read_analyze_data(analyze_filepath: str) -> tuple`**
+    *   Description: Reads Analyze 7.5 files (.hdr/.img) using Nibabel, returning image data, affine, and header.
+    *   Status: `Implemented (Wraps Nibabel)`
+*   **`write_analyze_data(output_filepath: str, data: np.ndarray, affine: np.ndarray, header: nib.analyze.AnalyzeHeader = None)`**
+    *   Description: Writes image data to Analyze 7.5 format using Nibabel.
+    *   Status: `Implemented (Wraps Nibabel)`
 
 ## Fitting
 

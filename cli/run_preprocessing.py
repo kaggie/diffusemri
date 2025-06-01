@@ -13,12 +13,20 @@ from .cli_utils import (
 # If running cli scripts directly, relative paths from project root might be needed for imports.
 try:
     from diffusemri.preprocessing.masking import create_brain_mask
+    from diffusemri.preprocessing.masking import create_brain_mask
     from diffusemri.preprocessing.denoising import denoise_mppca_data, correct_gibbs_ringing_dipy
-    from diffusemri.preprocessing.denoising import denoise_mppca_data, correct_gibbs_ringing_dipy
+    # Note: Removed duplicate import of denoise_mppca_data, correct_gibbs_ringing_dipy
     from diffusemri.preprocessing.correction import (
         correct_motion_eddy_fsl, load_eddy_outlier_report,
         correct_susceptibility_topup_fsl, correct_bias_field_dipy
     )
+    from diffusemri.data_io.dicom_utils import ( # Added for DICOM CLI functions
+        convert_dwi_dicom_to_nifti,
+        convert_dicom_to_nifti_main,
+        anonymize_dicom_directory,
+        anonymize_dicom_file
+    )
+    from diffusemri.data_io.cli_utils import load_config_from_json_yaml # For anonymization rules
 except ImportError:
     # Fallback for direct script execution if 'diffusemri' is not in PYTHONPATH
     # This allows running from 'python cli/run_preprocessing.py ...' if diffusemri is project root
@@ -30,11 +38,20 @@ except ImportError:
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
     from diffusemri.preprocessing.masking import create_brain_mask
-    from diffusemri.preprocessing.denoising import denoise_mppca_data
+    # Ensure correct_gibbs_ringing_dipy is imported if not already via the above block
+    from diffusemri.preprocessing.denoising import denoise_mppca_data, correct_gibbs_ringing_dipy
     from diffusemri.preprocessing.correction import (
         correct_motion_eddy_fsl, load_eddy_outlier_report,
         correct_susceptibility_topup_fsl, correct_bias_field_dipy
     )
+    # Fallback for DICOM utils
+    from diffusemri.data_io.dicom_utils import (
+        convert_dwi_dicom_to_nifti,
+        convert_dicom_to_nifti_main,
+        anonymize_dicom_directory,
+        anonymize_dicom_file
+    )
+    from diffusemri.data_io.cli_utils import load_config_from_json_yaml
 
 
 def setup_masking_parser(parser: argparse.ArgumentParser):
@@ -294,6 +311,90 @@ def run_gibbs_ringing_correction_dipy(args):
         print(f"An unexpected error occurred during Gibbs ringing correction: {e}", file=sys.stderr)
         sys.exit(1)
 
+# --- DICOM to NIfTI Subcommand ---
+def setup_dicom_to_nifti_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_dicom_dir', required=True, help="Path to the directory containing DICOM series.")
+    parser.add_argument('--output_nifti_file', required=True, help="Path for the output NIfTI file.")
+    parser.add_argument('--is_dwi', action='store_true', help="Flag to indicate if the DICOM series is diffusion-weighted (for bval/bvec extraction).")
+    parser.add_argument('--output_bval_file', help="Path for the output b-values file (required if --is_dwi).")
+    parser.add_argument('--output_bvec_file', help="Path for the output b-vectors file (required if --is_dwi).")
+    parser.set_defaults(func=run_dicom_to_nifti)
+
+def run_dicom_to_nifti(args):
+    print(f"Starting DICOM to NIfTI conversion for directory: {args.input_dicom_dir}")
+    if args.is_dwi:
+        if not args.output_bval_file or not args.output_bvec_file:
+            print("Error: --output_bval_file and --output_bvec_file are required when --is_dwi is set.", file=sys.stderr)
+            sys.exit(1)
+        success = convert_dwi_dicom_to_nifti(
+            dicom_dir=args.input_dicom_dir,
+            output_nifti_file=args.output_nifti_file,
+            output_bval_file=args.output_bval_file,
+            output_bvec_file=args.output_bvec_file
+        )
+    else:
+        success = convert_dicom_to_nifti_main(
+            dicom_dir=args.input_dicom_dir,
+            output_nifti_file=args.output_nifti_file
+        )
+
+    if success:
+        print(f"DICOM to NIfTI conversion successful. Output saved to: {args.output_nifti_file}")
+        if args.is_dwi:
+            print(f"  bval/bvec files saved to: {args.output_bval_file}, {args.output_bvec_file}")
+    else:
+        print("DICOM to NIfTI conversion failed.", file=sys.stderr)
+        sys.exit(1)
+
+# --- Anonymize DICOM Subcommand ---
+def setup_anonymize_dicom_parser(parser: argparse.ArgumentParser):
+    parser.add_argument('--input_path', required=True, help="Path to a single DICOM file or a directory of DICOMs.")
+    parser.add_argument('--output_path', required=True, help="Path to the output anonymized DICOM file or directory.")
+    parser.add_argument('--is_directory', action='store_true', help="Flag if --input_path is a directory. If not set, attempts to auto-detect.")
+    parser.add_argument('--preserve_structure', action='store_true', default=True, help="Preserve subdirectory structure (default: True, only for directory mode).")
+    parser.add_argument('--no_preserve_structure', action='store_false', dest='preserve_structure', help="Do not preserve subdirectory structure (only for directory mode).")
+    parser.add_argument('--rules_json', help="Path to a JSON file defining custom anonymization rules.")
+    parser.set_defaults(func=run_anonymize_dicom)
+
+def run_anonymize_dicom(args):
+    print(f"Starting DICOM anonymization for: {args.input_path}")
+    custom_rules = None
+    if args.rules_json:
+        try:
+            custom_rules = load_config_from_json_yaml(args.rules_json) # Reusing this loader
+            print(f"Loaded custom anonymization rules from: {args.rules_json}")
+        except Exception as e:
+            print(f"Error loading custom anonymization rules: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    is_directory_mode = args.is_directory or os.path.isdir(args.input_path)
+
+    if is_directory_mode:
+        if not os.path.isdir(args.input_path):
+            print(f"Error: Input path {args.input_path} is not a directory, but --is_directory or auto-detection suggests it should be.", file=sys.stderr)
+            sys.exit(1)
+        processed, failed = anonymize_dicom_directory(
+            input_dir=args.input_path,
+            output_dir=args.output_path,
+            anonymization_rules=custom_rules,
+            preserve_structure=args.preserve_structure
+        )
+        print(f"DICOM directory anonymization complete. Processed: {processed}, Failed: {failed}")
+        if failed > 0: sys.exit(1)
+    else:
+        if not os.path.isfile(args.input_path):
+            print(f"Error: Input path {args.input_path} is not a file.", file=sys.stderr)
+            sys.exit(1)
+        success = anonymize_dicom_file(
+            input_dicom_path=args.input_path,
+            output_dicom_path=args.output_path,
+            anonymization_rules=custom_rules
+        )
+        if success:
+            print(f"DICOM file anonymization successful. Output: {args.output_path}")
+        else:
+            print("DICOM file anonymization failed.", file=sys.stderr)
+            sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -347,6 +448,20 @@ def main():
         description="Wraps Dipý's `gibbs_removal` for correcting Gibbs ringing artifacts."
     )
     setup_gibbs_ringing_dipy_parser(gibbs_parser)
+
+    dicom_to_nifti_parser = subparsers.add_parser(
+        "dicom_to_nifti",
+        help="Convert DICOM series to NIfTI format, with optional DWI handling.",
+        description="Converts a directory of DICOM files to NIfTI. If --is_dwi is specified, also extracts bval/bvec."
+    )
+    setup_dicom_to_nifti_parser(dicom_to_nifti_parser)
+
+    anonymize_dicom_parser = subparsers.add_parser(
+        "anonymize_dicom",
+        help="Anonymize DICOM files by removing or modifying tags.",
+        description="Anonymizes a single DICOM file or a directory of DICOM files based on predefined or custom rules."
+    )
+    setup_anonymize_dicom_parser(anonymize_dicom_parser)
 
     if len(sys.argv) <= 1: # No arguments or just script name
         parser.print_help(sys.stderr)

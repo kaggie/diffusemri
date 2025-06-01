@@ -271,3 +271,66 @@ This section details the tools available in the `diffusemri` library to help pre
     #     print(f"One of the input files for Gibbs ringing correction was not found: {e}")
     print("Note: The Gibbs ringing correction example requires Dipý installed, input files, and the function imported.")
     ```
+
+## DICOM to NIfTI Conversion
+
+*   **Purpose:** To convert medical images from DICOM format (typically a series of 2D files) into the NIfTI format (often a single 3D or 4D file), which is commonly used in neuroimaging research. For diffusion-weighted imaging (DWI), this process also involves extracting b-values and b-vectors.
+*   **CLI Tool:** `run_preprocessing dicom_to_nifti`
+*   **Key Functions:**
+    *   `diffusemri.data_io.dicom_utils.convert_dwi_dicom_to_nifti()`: For DWI data, extracts image data, b-values, b-vectors, and metadata, saving them as NIfTI, .bval, .bvec, and a JSON sidecar file.
+    *   `diffusemri.data_io.dicom_utils.convert_dicom_to_nifti_main()`: For non-DWI data (e.g., anatomical T1w), converts DICOM series to NIfTI and saves basic metadata to a JSON sidecar.
+*   **Method:** Reads DICOM files from a directory, sorts them, extracts pixel data and relevant metadata (including DWI-specific information if applicable), constructs an affine matrix, and saves the data in NIfTI format. B-values and b-vectors are saved to separate text files for DWI.
+*   **Dependencies:** Requires `pydicom` for reading DICOM files and `nibabel` for NIfTI handling.
+*   **Conceptual CLI Usage:**
+    ```bash
+    # For DWI data
+    python cli/run_preprocessing.py dicom_to_nifti \\
+        --input_dicom_dir /path/to/dwi_dicom_series \\
+        --output_nifti_file /path/to/output/dwi.nii.gz \\
+        --output_bval_file /path/to/output/dwi.bval \\
+        --output_bvec_file /path/to/output/dwi.bvec \\
+        --is_dwi
+
+    # For non-DWI data (e.g., anatomical T1w)
+    python cli/run_preprocessing.py dicom_to_nifti \\
+        --input_dicom_dir /path/to/anatomical_dicom_series \\
+        --output_nifti_file /path/to/output/t1w.nii.gz
+        # Note: --is_dwi is not specified, so it defaults to False or non-DWI path
+    ```
+
+## DICOM Anonymization
+
+*   **Purpose:** To de-identify DICOM files by removing or modifying specific patient-identifying information (PII) tags. This is crucial for sharing data while protecting patient privacy.
+*   **CLI Tool:** `run_preprocessing anonymize_dicom`
+*   **Key Functions:**
+    *   `diffusemri.data_io.dicom_utils.anonymize_dicom_directory()`: Anonymizes all DICOM files within a specified directory, optionally preserving the directory structure.
+    *   `diffusemri.data_io.dicom_utils.anonymize_dicom_file()`: Anonymizes a single DICOM file.
+*   **Method:** The tool uses a default profile of common PII tags to either remove them or replace their values with generic placeholders (e.g., empty strings, "000000", "19000101"). Users can also provide a custom JSON file specifying their own rules for tag modification or removal. Essential image processing tags (like orientation, spacing, diffusion parameters) are generally preserved by default.
+*   **Dependencies:** Requires `pydicom`.
+*   **Note on Compliance:** This tool performs tag editing for de-identification. For strict compliance with regulations like HIPAA, ensure your anonymization rules and procedures are thoroughly vetted and meet all legal requirements. This tool provides a technical means for tag modification but does not guarantee legal compliance on its own.
+*   **Conceptual CLI Usage:**
+    ```bash
+    # Anonymize a single DICOM file with default rules
+    python cli/run_preprocessing.py anonymize_dicom \\
+        --input_path /path/to/single.dcm \\
+        --output_path /path/to/output/anonymized.dcm
+
+    # Anonymize an entire DICOM directory with default rules, preserving structure
+    python cli/run_preprocessing.py anonymize_dicom \\
+        --input_path /path/to/dicom_directory \\
+        --output_path /path/to/output_anonymized_directory \\
+        --is_directory
+
+    # Anonymize with custom rules from a JSON file
+    # Example my_rules.json:
+    # {
+    #   "PatientName": "PatientX",
+    #   "InstitutionName": "_REMOVE_TAG_",
+    #   "(0x0010,0x0020)": "CustomPatientID"
+    # }
+    python cli/run_preprocessing.py anonymize_dicom \\
+        --input_path /path/to/dicom_directory \\
+        --output_path /path/to/output_anonymized_directory \\
+        --is_directory \\
+        --rules_json /path/to/my_rules.json
+    ```

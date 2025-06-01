@@ -274,6 +274,48 @@ The library also includes tools to help prepare your dMRI data for analysis:
     *   **Method**: This function serves as a wrapper for FSL's powerful `eddy` tool (typically `eddy_openmp` or `eddy_cuda`). It uses Nipype to interface with the FSL command-line tool. `eddy` can model and correct complex distortions, handle multi-shell data, and detect/replace outlier slices (e.g., by passing `repol=True` in `**kwargs`). The wrapper returns paths to the corrected DWI image, the rotated b-vectors, and optionally outlier reports.
     *   **Dependency**: This feature requires a local installation of FSL (with `eddy` available in the system PATH) and the `nipype` library. Users must ensure compliance with FSL's licensing terms.
     *   **Outlier Information**: A helper function `diffusemri.preprocessing.correction.load_eddy_outlier_report()` is available to parse the textual outlier report produced by `eddy`.
+    *   **Susceptibility Distortion Correction (FSL TOPUP)**:
+        *   **Purpose**: Corrects for geometric distortions caused by susceptibility-induced field inhomogeneities, typically using images with opposing phase-encoding directions (e.g., AP-PA b0s).
+        *   **Function**: `diffusemri.preprocessing.correction.correct_susceptibility_topup_fsl()`
+        *   **Method**: Wraps FSL's `topup` (for field estimation) and `applytopup` (to apply correction) tools via Nipype.
+        *   **Dependency**: Requires FSL and Nipype.
+    *   **Bias Field Correction (Dipý N4)**:
+        *   **Purpose**: Corrects for low-frequency intensity non-uniformities (bias field) in MR images.
+        *   **Function**: `diffusemri.preprocessing.correction.correct_bias_field_dipy()`
+        *   **Method**: Wraps Dipý's `BiasFieldCorrectionFlow` using the 'n4' method (N4ITK algorithm).
+        *   **Dependency**: Requires Dipý and its N4 dependencies (e.g., ANTs/ITK).
+    *   **Gibbs Ringing Correction (Dipý)**:
+        *   **Purpose**: Reduces Gibbs ringing artifacts, which are spurious oscillations near sharp intensity transitions.
+        *   **Function**: `diffusemri.preprocessing.denoising.correct_gibbs_ringing_dipy()`
+        *   **Method**: Wraps Dipý's `dipy.denoise.gibbs_removal` function.
+        *   **Dependency**: Requires Dipý.
+
+### DICOM Utilities
+The library provides tools for handling DICOM data:
+*   **DICOM to NIfTI Conversion**:
+    *   Convert DICOM series to NIfTI format.
+    *   For DWI data, automatically extracts and saves b-values and b-vectors.
+    *   Relevant functions: `diffusemri.data_io.dicom_utils.convert_dwi_dicom_to_nifti()`, `diffusemri.data_io.dicom_utils.convert_dicom_to_nifti_main()`.
+*   **DICOM Anonymization**:
+    *   Remove or modify patient-identifying information from DICOM tags.
+    *   Supports default and custom anonymization rules.
+    *   Relevant functions: `diffusemri.data_io.dicom_utils.anonymize_dicom_directory()`, `diffusemri.data_io.dicom_utils.anonymize_dicom_file()`.
+*   **NRRD Format Conversion**:
+    *   Conversion between NIfTI and NRRD formats.
+    *   Supports DWI data (b-values/b-vectors) during conversion.
+    *   Relevant functions: `diffusemri.data_io.nrrd_utils.read_nrrd_data()`, `diffusemri.data_io.nrrd_utils.write_nrrd_data()`.
+*   **MHD/MHA Format Conversion**:
+    *   Conversion between NIfTI and MHD/MHA formats using SimpleITK.
+    *   Supports DWI data (b-values/b-vectors) during conversion.
+    *   Relevant functions: `diffusemri.data_io.mhd_utils.read_mhd_data()`, `diffusemri.data_io.mhd_utils.write_mhd_data()`.
+*   **Analyze 7.5 Format Conversion**:
+    *   Basic conversion between NIfTI and Analyze 7.5 formats (`.hdr`/`.img`).
+    *   Note: Analyze 7.5 has limited support for orientation and no standard DWI metadata.
+    *   Relevant functions: `diffusemri.data_io.analyze_utils.read_analyze_data()`, `diffusemri.data_io.analyze_utils.write_analyze_data()`.
+*   **Format Conversion CLI**:
+    *   The `run_format_conversion` CLI tool provides subcommands for `nrrd2nii`, `nii2nrrd`, `mhd2nii`, `nii2mhd`, `analyze2nii`, and `nii2analyze`.
+
+For more details on these preprocessing tools and DICOM/NRRD/MHD/Analyze utilities, including their command-line interfaces, please refer to the [Preprocessing Tools Wiki](wiki/01_Preprocessing_Tools.md) and the [Format Conversion Wiki](wiki/07_Format_Conversion.md).
 
 ## Tractography
 
