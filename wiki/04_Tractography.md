@@ -2,6 +2,8 @@
 
 Tractography, also known as fiber tracking, is a set of computational methods used to reconstruct white matter pathways (fiber tracts or streamlines) in the brain from diffusion MRI (dMRI) data. This library provides tools for deterministic tractography.
 
+**Note on Data Loading and Prerequisite Model Fitting:** The examples in this section assume you have already loaded your dMRI data (e.g., into NumPy arrays and a Dipy `GradientTable` or `PyTorchGradientTable`) and, for some tractography methods, fitted an appropriate local diffusion model (like CSD to get ODFs or their spherical harmonic coefficients). Please refer to previous wiki pages (`02_Diffusion_Models.md`) and example notebooks (`examples/`) for details on data loading, format conversion, and model fitting. For instance, the `track_deterministic_oudf` function described below internally fits a CSD model, so it requires raw DWI data.
+
 ## Deterministic Tractography
 
 Deterministic tractography algorithms reconstruct streamlines by iteratively following the most probable orientation from a local diffusion model at each step.
@@ -13,90 +15,64 @@ Deterministic tractography algorithms reconstruct streamlines by iteratively fol
 *   **Core Methodology & Key Inputs:**
     The current implementation performs ODF modeling, peak extraction, and tracking primarily using PyTorch-based components.
     *   **Input Data:**
-        *   `dwi_data` (np.ndarray): The 4D dMRI data. This is converted to a PyTorch tensor internally.
-        *   `gtab` (dipy.core.gradients.GradientTable): A Dipy GradientTable object containing b-values and b-vectors. This is used by the internal peak extraction model.
-        *   `seeds` (np.ndarray): Seed points for initiating tracking. Can be a 3D binary mask (NumPy array) or an N x 3 array of coordinates in voxel space. This is converted to PyTorch tensors for internal processing; mask-based seeds are generated using Dipy's `seeds_from_mask`.
-        *   `affine` (np.ndarray): A 4x4 affine transformation matrix mapping voxel coordinates to world/scanner space. Converted to a PyTorch tensor internally.
-        *   `stopping_metric_map` (np.ndarray): A 3D scalar map (e.g., FA or a binary mask) used for the stopping criterion. Converted to a PyTorch tensor internally.
-        *   `stopping_threshold_value` (float): Threshold applied to the `stopping_metric_map` to determine when tracking should terminate.
-    *   **Internal ODF Modeling and Peak Extraction (PyTorch-based):**
-        *   The function internally uses the `PeaksFromModel` class (from `diffusemri.tracking.pytorch_tracking_pipeline`) to:
-            *   Perform a CSD-like Spherical Harmonic (SH) fit to the input `dwi_data` and `gtab`.
-            *   Evaluate the Orientation Distribution Function (ODF).
-            *   Extract peak orientations from the ODF in each voxel.
-        *   This process is controlled by parameters like `sh_order`, `model_max_peaks`, `model_min_separation_angle`, and `model_peak_threshold`.
-        *   The `PeaksFromModel` class itself uses Dipy's `get_sphere` internally.
+        *   `dwi_data` (np.ndarray): The 4D dMRI data.
+        *   `gtab` (dipy.core.gradients.GradientTable): A Dipy GradientTable object.
+        *   `seeds` (np.ndarray): Seed points for initiating tracking (3D binary mask or N x 3 voxel coordinates).
+        *   `affine` (np.ndarray): 4x4 affine transformation matrix.
+        *   `metric_map_for_stopping` (np.ndarray): A 3D scalar map (e.g., FA or GFA) used for stopping.
+        *   `stopping_threshold_value` (float): Threshold for `metric_map_for_stopping`.
+    *   **Internal ODF Modeling (CSD-like, PyTorch-based):**
+        *   The function uses `PeaksFromModel` (from `tracking.pytorch_tracking_pipeline`) to fit a CSD-like model, evaluate ODFs, and extract peak orientations. Controlled by `sh_order`, `response` (for CSD), peak extraction parameters.
     *   **Streamline Generation (PyTorch-based):**
-        *   The extracted PyTorch peak data is then used by the `PyTorchPeaksDirectionGetter`.
-        *   A `PyTorchThresholdStoppingCriterion` is initialized using the `stopping_metric_map` and `stopping_threshold_value`.
-        *   The `PyTorchLocalTracking` class (both from `diffusemri.tracking.pytorch_tracking_pipeline`) performs the step-by-step streamline generation.
-        *   This process is controlled by parameters like `step_size`, `max_crossing_angle`, `min_length`, `max_length`, and `max_steps`.
+        *   Uses `PyTorchPeaksDirectionGetter`, `PyTorchThresholdStoppingCriterion`, and `PyTorchLocalTracking`. Controlled by `step_size`, `max_crossing_angle`, length filters.
 *   **Output:**
-    *   A Dipy `Streamlines` object (`dipy.tracking.streamline.Streamlines`), which is a list-like container of the generated tracts (each tract being a NumPy array of 3D points in world coordinates). This ensures compatibility with Dipy's ecosystem for further analysis or visualization.
+    *   A Dipy `Streamlines` object (`dipy.tracking.streamline.Streamlines`).
 
-*   **Example Usage:**
+*   **Conceptual Python Example:**
     ```python
     import numpy as np
-    from dipy.core.gradients import gradient_table
-    from diffusemri.tracking.deterministic import track_deterministic_oudf
-    
-    # Create minimal synthetic data for tractography
-    vol_shape = (5, 5, 5) # A small 3D volume
-    num_gradients = 7 # 1 b0, 6 DWI
+    from dipy.core.gradients import gradient_table # For gtab creation
+    # from diffusemri.tracking.deterministic import track_deterministic_oudf # Actual import
 
-    # DWI data: Random data, b0 higher signal
-    dwi_data_np = np.random.rand(vol_shape[0], vol_shape[1], vol_shape[2], num_gradients).astype(np.float32) * 500
-    dwi_data_np[..., 0] = 1000 # b0 signal
-    # Simulate some anisotropy for tracking: make one direction have lower signal (higher diffusivity)
-    # For example, make signal lower along a simulated "bundle" in x-direction for y=2, z=2
-    dwi_data_np[2, 2, :, 1] = 300 # Lower signal for bvec (1,0,0)
-    dwi_data_np[2, 2, :, 4] = 300 # Lower signal for bvec (-1,0,0)
+    # --- Assume dwi_data_np, gtab, affine_np, seeds_np, fa_map_np are loaded/prepared ---
+    # vol_shape = (5,5,5); num_gradients = 7
+    # dwi_data_np = np.random.rand(vol_shape[0],vol_shape[1],vol_shape[2],num_gradients).astype(np.float32)
+    # bvals_np = np.array([0,1000,1000,1000,1000,1000,1000], dtype=float)
+    # bvecs_np = np.array([[0,0,0],[1,0,0],[0,1,0],[0,0,1],[-1,0,0],[0,-1,0],[0,0,-1]], dtype=float)
+    # gtab = gradient_table(bvals_np, bvecs_np)
+    # affine_np = np.eye(4)
+    # seeds_np = np.array([[2,2,2]], dtype=np.float32)
+    # fa_map_np = np.ones(vol_shape, dtype=np.float32) * 0.5
+    # fa_threshold = 0.1
 
-
-    # Gradient table (same as DTI example for simplicity)
-    bvals_np = np.array([0, 1000, 1000, 1000, 1000, 1000, 1000], dtype=np.float32)
-    bvecs_np = np.array([
-        [0,0,0], [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]
-    ], dtype=np.float32)
-    gtab = gradient_table(bvals_np, bvecs_np)
-
-    # Affine matrix (identity for simple voxel space)
-    affine_np = np.eye(4)
-
-    # Seeds: a single seed point in the middle of the volume
-    seeds_np = np.array([[2, 2, 2]], dtype=np.float32) # Voxel coordinates
-
-    # Stopping metric map: FA map (or simple ones for this example)
-    # For simplicity, use a map of ones, so tracking stops based on other criteria (angle, length)
-    # A more realistic FA map would be derived from DTI fitting.
-    fa_map_np = np.ones(vol_shape, dtype=np.float32)
-    fa_threshold = 0.1 # Low threshold as FA map is artificial
-
-    # Perform deterministic tractography
-    # Parameters are adjusted for the small synthetic data
-    streamlines_obj = track_deterministic_oudf(
-        dwi_data=dwi_data_np,
-        gtab=gtab,
-        seeds=seeds_np,
-        affine=affine_np,
-        metric_map_for_stopping=fa_map_np,
-        stopping_threshold_value=fa_threshold,
-        # Model parameters
-        sh_order=4,             # Lower SH order for small data
-        model_max_peaks=1,      # Expect simple structure
-        model_min_separation_angle=15,
-        model_peak_threshold=0.3,
-        # Tracking parameters
-        step_size=0.5,          # Standard step size
-        max_crossing_angle=60,  # Allow for some curvature
-        min_length=2.0,         # Shorter min length for small volume
-        max_length=20.0,        # Shorter max length
-        max_steps=40            # Max steps = max_length / step_size
-    )
-    
-    print(f"Generated {len(streamlines_obj)} streamlines.")
-    if len(streamlines_obj) > 0:
-        print(f"First streamline has {len(streamlines_obj[0])} points.")
-        # Example: print first point of the first streamline
-        # print(f"First point of first streamline: {streamlines_obj[0][0]}")
+    # Perform deterministic tractography (conceptual call)
+    # streamlines_obj = track_deterministic_oudf(
+    #     dwi_data=dwi_data_np,
+    #     gtab=gtab,
+    #     seeds=seeds_np,
+    #     affine=affine_np,
+    #     metric_map_for_stopping=fa_map_np,
+    #     stopping_threshold_value=fa_threshold,
+    #     sh_order=4, model_max_peaks=1, min_length=2.0, max_length=20.0
+    # )
+    # print(f"Generated {len(streamlines_obj) if 'streamlines_obj' in locals() else 'N/A (conceptual)'} streamlines.")
+    print("Note: Tractography example is conceptual. See '12_Deterministic_Tractography.ipynb' for a runnable version.")
     ```
+*   **CLI Usage:** Deterministic tractography can be run via `python cli/run_tracking.py det_oudf ...`. Refer to the script's help for arguments.
+
+## Probabilistic Tractography (Conceptual)
+
+While the primary `track_deterministic_oudf` is PyTorch-based, the library also contains a Dipy-based probabilistic tracking wrapper: `diffusemri.tracking.probabilistic.track_probabilistic_odf`.
+
+*   **Purpose:** Reconstructs pathways by sampling from orientation distributions (ODFs), representing uncertainty.
+*   **Key Function:** `diffusemri.tracking.probabilistic.track_probabilistic_odf()`
+*   **Methodology:** Leverages Dipy's `ProbabilisticDirectionGetter` and `LocalTracking`.
+*   **Main Inputs:**
+    *   `odf_fit_object`: A fitted ODF model object from Dipy (e.g., from `CsdModel` or `QballModel` wrappers if they expose the Dipy fit object).
+    *   `seeds` (np.ndarray): Seed points or mask.
+    *   `stopping_criterion` (dipy.tracking.stopping_criterion.StoppingCriterion).
+    *   `sphere` (dipy.data.Sphere).
+*   **Output:** Dipy `Streamlines` object.
+*   **Note:** This function requires a pre-fitted Dipy model object that provides ODF information (e.g., SH coefficients). The `diffusemri.models.CsdModel` and `QballModel` would need to expose the underlying Dipy fit object for use here.
+
+For detailed examples and runnable code, please refer to the Jupyter notebooks in the `examples/` directory, especially `12_Deterministic_Tractography.ipynb`.

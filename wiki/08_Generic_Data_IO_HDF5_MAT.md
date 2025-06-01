@@ -24,29 +24,28 @@ HDF5 (Hierarchical Data Format version 5) is a versatile file format designed to
 ### Conceptual Python Usage (HDF5):
 ```python
 import numpy as np
-from diffusemri.data_io.generic_utils import save_dict_to_hdf5, load_dict_from_hdf5
+# from diffusemri.data_io.generic_utils import save_dict_to_hdf5, load_dict_from_hdf5 # Actual import
 
 # Example data
-fa_map = np.random.rand(10, 10, 10).astype(np.float32)
-md_map = np.random.rand(10, 10, 10).astype(np.float32)
-streamlines_coeffs = [np.random.rand(100,3), np.random.rand(120,3)] # Note: HDF5 can store lists of arrays with some effort or as object arrays, but direct list of arrays not standard. This example might simplify. Best to store components that are ndarrays.
-# For simplicity, let's assume we save compatible ndarrays:
-data_to_save = {
-    "FA": fa_map,
-    "MD": md_map,
-    "Streamline_1_coords": streamlines_coeffs[0]
-}
-hdf5_file = "path/to/my_processed_data.h5"
+# fa_map = np.random.rand(10, 10, 10).astype(np.float32)
+# md_map = np.random.rand(10, 10, 10).astype(np.float32)
+# data_to_save = {
+#     "FA": fa_map,
+#     "MD": md_map,
+# }
+# hdf5_file = "path/to/my_processed_data.h5"
 
 # Save data
-save_dict_to_hdf5(data_to_save, hdf5_file)
-print(f"Data saved to {hdf5_file}")
+# save_dict_to_hdf5(data_to_save, hdf5_file)
+# print(f"Data saved to {hdf5_file}")
 
 # Load data back
-loaded_data = load_dict_from_hdf5(hdf5_file)
-if loaded_data:
-    print(f"Loaded FA map shape: {loaded_data['FA'].shape}")
-    print(f"Loaded MD map mean: {np.mean(loaded_data['MD'])}")
+# loaded_data = load_dict_from_hdf5(hdf5_file)
+# if loaded_data and 'FA' in loaded_data:
+#     print(f"Loaded FA map shape: {loaded_data['FA'].shape}")
+# else:
+#     print("Conceptual HDF5 example - see examples/04_Generic_HDF5_MAT_IO.ipynb for runnable code.")
+print("Conceptual HDF5 example - see examples/04_Generic_HDF5_MAT_IO.ipynb for runnable code.")
 ```
 
 ## MATLAB .MAT File I/O Utilities
@@ -55,7 +54,7 @@ MATLAB .MAT files (version 5 by default with SciPy) are commonly used for storin
 
 ### Key Functions:
 *   **`diffusemri.data_io.generic_utils.save_dict_to_mat(data_dict: dict, mat_filepath: str, oned_as: str = 'column')`**:
-    *   **Purpose:** Saves a Python dictionary, where keys are strings (variable names) and values are NumPy arrays, to a .MAT file.
+    *   **Purpose:** Saves a Python dictionary, where keys are strings (variable names) and values are NumPy arrays (or other compatible types like strings, scalars), to a .MAT file.
     *   **Arguments:**
         *   `data_dict` (dict): The dictionary to save.
         *   `mat_filepath` (str): Path to the output .MAT file (e.g., `my_data.mat`).
@@ -72,27 +71,31 @@ MATLAB .MAT files (version 5 by default with SciPy) are commonly used for storin
 ### Conceptual Python Usage (.MAT):
 ```python
 import numpy as np
-from diffusemri.data_io.generic_utils import save_dict_to_mat, load_dict_from_mat
+# from diffusemri.data_io.generic_utils import save_dict_to_mat, load_dict_from_mat # Actual import
 
 # Example data
-tract_lengths = np.array([10.5, 22.1, 15.3])
-connectivity_matrix = np.random.randint(0, 100, size=(5,5))
-
-data_to_save_mat = {
-    "tract_lengths": tract_lengths,
-    "connectivity": connectivity_matrix
-}
-mat_file = "path/to/my_analysis_results.mat"
+# tract_lengths = np.array([10.5, 22.1, 15.3])
+# connectivity_matrix = np.random.randint(0, 100, size=(5,5))
+# data_to_save_mat = {
+#     "tract_lengths": tract_lengths,
+#     "connectivity": connectivity_matrix
+# }
+# mat_file = "path/to/my_analysis_results.mat"
 
 # Save data
-save_dict_to_mat(data_to_save_mat, mat_file)
-print(f"Data saved to {mat_file}")
+# save_dict_to_mat(data_to_save_mat, mat_file)
+# print(f"Data saved to {mat_file}")
 
 # Load data back
-loaded_mat_data = load_dict_from_mat(mat_file)
-if loaded_mat_data:
-    print(f"Loaded tract lengths: {loaded_mat_data['tract_lengths']}")
-    print(f"Loaded connectivity matrix shape: {loaded_mat_data['connectivity'].shape}")
+# loaded_mat_data = load_dict_from_mat(mat_file)
+# if loaded_mat_data and 'tract_lengths' in loaded_mat_data:
+#     print(f"Loaded tract lengths: {loaded_mat_data['tract_lengths']}")
+# else:
+#     print("Conceptual .MAT example - see examples/04_Generic_HDF5_MAT_IO.ipynb for runnable code.")
+print("Conceptual .MAT example - see examples/04_Generic_HDF5_MAT_IO.ipynb for runnable code.")
 ```
 
-**Note:** These generic I/O utilities are designed for flexibility in saving and loading collections of NumPy arrays. They do not store rich NIfTI header information (like affine transformations or detailed imaging parameters) directly within the HDF5 or .MAT structures unless explicitly included as separate datasets/variables by the user. When loading data for further spatial processing, ensure you have the necessary spatial context (e.g., affine, dimensions) from other sources if it's not part of the saved arrays.
+**Note:** These generic I/O utilities are designed for flexibility in saving and loading collections of NumPy arrays and basic Python types (for .MAT). They do not store rich NIfTI header information (like affine transformations or detailed imaging parameters) directly within the HDF5 or .MAT structures unless explicitly included as separate datasets/variables by the user. When loading data for further spatial processing, ensure you have the necessary spatial context (e.g., affine, dimensions) from other sources if it's not part of the saved arrays.
+
+---
+For detailed, runnable examples of these I/O utilities, please refer to the `examples/04_Generic_HDF5_MAT_IO.ipynb` Jupyter notebook.
